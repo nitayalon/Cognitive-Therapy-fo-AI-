@@ -1,0 +1,221 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "stopOnEntry": false,
+            "justMyCode": true
+        },
+        {
+            "name": "Python: ToM-RL Demo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tom_rl_demo.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "stopOnEntry": false,
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Main Experiment (Quick Test)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "hawk-dove,battle-of-sexes,prisoners-dilemma",
+                "--test-game", "stag-hunt",
+                "--opponents", "0.3,0.7",
+                "--max-epochs", "1000",
+                "--num-games", "20",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Main Experiment (Full Training)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "hawk-dove,battle-of-sexes,prisoners-dilemma",
+                "--test-game", "stag-hunt",
+                "--opponents", "0.1,0.3,0.5,0.7,0.9",
+                "--max-epochs", "50000",
+                "--num-games", "100",
+                "--adaptive-loss",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Hawk-Dove Experiment",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "hawk-dove",
+                "--test-game", "prisoners-dilemma",
+                "--opponents", "0.2,0.5,0.8",
+                "--max-epochs", "300",
+                "--num-games", "50",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Battle-of-Sexes Experiment",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "battle-of-sexes",
+                "--test-game", "stag-hunt",
+                "--opponents", "0.4,0.6",
+                "--max-epochs", "200",
+                "--num-games", "75",
+                "--adaptive-loss"
+            ]
+        },
+        {
+            "name": "Python: Multi-Game Training (Quick Test)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "prisoners-dilemma,hawk-dove",
+                "--test-game", "battle-of-sexes",
+                "--opponents", "0.3,0.7",
+                "--max-epochs", "10",
+                "--num-games", "20",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Multi-Game Training (Full Experiment)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "prisoners-dilemma,hawk-dove,battle-of-sexes",
+                "--test-game", "stag-hunt",
+                "--opponents", "0.2,0.4,0.6,0.8",
+                "--max-epochs", "300",
+                "--num-games", "100",
+                "--adaptive-loss",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Cross-Game Generalization Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "prisoners-dilemma,stag-hunt",
+                "--test-game", "hawk-dove",
+                "--opponents", "0.1,0.3,0.5,0.7,0.9",
+                "--max-epochs", "250",
+                "--num-games", "80",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Framework Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_framework.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "name": "Python: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": "${command:pickArgs}"
+        },
+        {
+            "name": "Python: Module (src)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "cognitive_therapy_ai",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "name": "Python: Simple Debug (No Env)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+        }
+    ]
+}

@@ -1,0 +1,47 @@
+{
+  "network_config": {
+    "hidden_size": 128,
+    "num_layers": 2,
+    "dropout": 0.1
+  },
+  "training_config": {
+    "num_games_per_partner": 100,
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "max_epochs": 500,
+    "convergence_threshold": 1e-6,
+    "patience": 50,
+    "reward_loss_weight": 1.0,
+    "action_prediction_loss_weight": 1.0,
+    "type_prediction_loss_weight": 1.0
+  },
+  "experiment_config": {
+    "opponent_defection_probs": [0.1, 0.3, 0.5, 0.7, 0.9],
+    "random_seed": 42,
+    "save_checkpoints": true,
+    "checkpoint_dir": "checkpoints",
+    "log_level": "INFO"
+  },
+  "games": {
+    "hawk-dove": {
+      "resource_value": 6.0,
+      "cost_of_conflict": 10.0
+    },
+    "prisoners-dilemma": {
+      "T": 5.0,
+      "R": 3.0,
+      "P": 1.0,
+      "S": 0.0
+    },
+    "battle-of-sexes": {
+      "player_preferred": 3.0,
+      "player_dispreferred": 2.0,
+      "miscoordination": 0.0
+    },
+    "stag-hunt": {
+      "stag_payoff": 4.0,
+      "hare_payoff": 2.0,
+      "stag_failure": 0.0
+    }
+  }
+}

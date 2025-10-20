@@ -1,0 +1,74 @@
+{
+  "training_games": [
+    "prisoners-dilemma"
+  ],
+  "test_game": "hawk-dove",
+  "opponent_probabilities": [
+    0.3,
+    0.7
+  ],
+  "network_config": {
+    "hidden_size": 128,
+    "num_layers": 2,
+    "dropout": 0.1,
+    "input_size": 5
+  },
+  "training_config": {
+    "num_games_per_partner": 20,
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "max_epochs": 10,
+    "convergence_threshold": 1e-06,
+    "patience": 50,
+    "reward_loss_weight": 1.0,
+    "action_prediction_loss_weight": 1.0,
+    "type_prediction_loss_weight": 1.0
+  },
+  "training_results": {
+    "games": [
+      "prisoners-dilemma"
+    ],
+    "game_weights": {
+      "prisoners-dilemma": 1.0
+    },
+    "opponents": [
+      "Probabilistic-p0.30",
+      "Probabilistic-p0.70"
+    ],
+    "epoch_results": [
+      {
+        "total_loss": 2.0,
+        "mixed_batch_loss": {
+          "total_loss": 2.0,
+          "rl_loss": 17.96282386779785,
+          "rl_loss_normalized": 1.0,
+          "opponent_prediction_loss": 0.6928241848945618,
+          "opponent_prediction_loss_normalized": 1.0,
+          "advantages_mean": 25.941654205322266,
+          "advantages_std": 9.860011100769043,
+          "alpha": 1.0,
+          "normalization_stats": {
+            "rl_loss_scale": 17.96282386779785,
+            "op_loss_scale": 0.6928241848945618
+          }
+        },
+        "per_game_losses": {
+          "prisoners-dilemma": {
+            "total_loss": 2.0,
+            "rl_loss": 17.96282386779785,
+            "rl_loss_normalized": 1.0,
+            "opponent_prediction_loss": 0.6928241848945618,
+            "opponent_prediction_loss_normalized": 1.0,
+            "advantages_mean": 25.941654205322266,
+            "advantages_std": 9.860011100769043,
+            "alpha": 1.0,
+            "normalization_stats": {
+              "rl_loss_scale": 17.96282386779785,
+              "op_loss_scale": 0.6928241848945618
+            }
+          }
+        },
+        "game_session_stats": {
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 

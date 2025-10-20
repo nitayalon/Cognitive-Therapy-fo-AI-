@@ -1,0 +1,59 @@
+{
+  "experiment_summary": {
+    "experiment_type": "multi_game_training",
+    "training_games": [
+      "hawk-dove",
+      "battle-of-sexes",
+      "prisoners-dilemma"
+    ],
+    "test_game": "stag-hunt",
+    "timestamp": "2025-10-17T12:20:43.796524",
+    "network_parameters": 226244,
+    "device": "cpu"
+  },
+  "training_phase": {
+    "multi_game_training": {
+      "training_epochs": 90,
+      "final_loss": 0.9747576117515564,
+      "games_trained": [
+        "hawk-dove",
+        "battle-of-sexes",
+        "prisoners-dilemma"
+      ],
+      "convergence_achieved": true
+    },
+    "per_game_breakdown": {
+      "hawk-dove": {
+        "final_loss": 1.8787169456481934,
+        "rl_loss": 9.45146656036377,
+        "opponent_prediction_loss": 0.6941938400268555
+      },
+      "battle-of-sexes": {
+        "final_loss": 0.0,
+        "rl_loss": 0.0,
+        "opponent_prediction_loss": 0.0
+      },
+      "prisoners-dilemma": {
+        "final_loss": 2.3024096488952637,
+        "rl_loss": 14.328557968139648,
+        "opponent_prediction_loss": 0.67609703540802
+      }
+    }
+  },
+  "testing_phase": {
+    "stag-hunt": {
+      "performance_metrics": {
+        "Probabilistic-p0.70": {
+          "avg_reward": 0,
+          "cooperation_rate": 0.7779999999999998,
+          "win_rate": 0
+        },
+        "Probabilistic-p0.30": {
+          "avg_reward": 0,
+          "cooperation_rate": 0.7689999999999999,
+          "win_rate": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "network_config": {
+    "hidden_size": 64,
+    "num_layers": 1,
+    "dropout": 0.0
+  },
+  "training_config": {
+    "num_games_per_partner": 50,
+    "learning_rate": 0.01,
+    "batch_size": 32,
+    "max_epochs": 100,
+    "convergence_threshold": 1e-4,
+    "patience": 20,
+    "reward_loss_weight": 1.0,
+    "action_prediction_loss_weight": 1.0,
+    "type_prediction_loss_weight": 1.0
+  },
+  "experiment_config": {
+    "opponent_defection_probs": [0.3, 0.7],
+    "random_seed": 42,
+    "save_checkpoints": false,
+    "log_level": "INFO"
+  }
+}
