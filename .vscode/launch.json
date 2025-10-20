@@ -46,7 +46,7 @@
             "args": [
                 "--training-games", "hawk-dove,battle-of-sexes,prisoners-dilemma",
                 "--test-game", "stag-hunt",
-                "--opponents", "0.3,0.7",
+                "--opponents", "0.8,0.7",
                 "--max-epochs", "1000",
                 "--num-games", "20",
                 "--verbose"

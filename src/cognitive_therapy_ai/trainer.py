@@ -295,6 +295,10 @@ class GameTrainer:
         self.best_loss = float('inf')
         self.patience_counter = 0
         
+        # Performance tracking across epochs
+        self.epoch_rewards = []  # Store cumulative rewards per epoch
+        self.epoch_cooperation_rates = []  # Store network cooperation rates per epoch
+        
         self.logger = logging.getLogger(__name__)
     
     def train_on_game(
@@ -527,12 +531,30 @@ class GameTrainer:
                 'state_size': game.get_state_size()
             }
         
+        # Calculate reward and cooperation statistics
+        reward_stats = {
+            'cumulative_rewards_per_epoch': self.epoch_rewards,
+            'average_reward_per_epoch': [r / max(1, len(games) * self.config.__dict__.get('num_games_per_partner', 1)) for r in self.epoch_rewards],
+            'total_cumulative_reward': sum(self.epoch_rewards),
+            'mean_reward_across_epochs': np.mean(self.epoch_rewards) if self.epoch_rewards else 0.0,
+            'final_epoch_reward': self.epoch_rewards[-1] if self.epoch_rewards else 0.0
+        }
+        
+        cooperation_stats = {
+            'cooperation_rates_per_epoch': self.epoch_cooperation_rates,
+            'mean_cooperation_rate': np.mean(self.epoch_cooperation_rates) if self.epoch_cooperation_rates else 0.0,
+            'final_cooperation_rate': self.epoch_cooperation_rates[-1] if self.epoch_cooperation_rates else 0.0,
+            'cooperation_trend': 'increasing' if len(self.epoch_cooperation_rates) > 1 and self.epoch_cooperation_rates[-1] > self.epoch_cooperation_rates[0] else 'decreasing' if len(self.epoch_cooperation_rates) > 1 else 'stable'
+        }
+        
         return {
             'total_epochs': self.current_epoch + 1,
             'best_loss': self.best_loss,
             'convergence_info': convergence_info,
             'loss_statistics': loss_stats,
             'games_info': game_info,
+            'reward_statistics': reward_stats,
+            'cooperation_statistics': cooperation_stats,
             'final_weights': {
                 'alpha': self.loss_fn.alpha,
                 'gamma': self.loss_fn.gamma,
@@ -745,13 +767,29 @@ class GameTrainer:
             else:
                 mixed_batch_loss_record[k] = v
         
+        # Calculate epoch-level reward and cooperation metrics
+        epoch_cumulative_reward = 0.0
+        epoch_cooperation_rates = []
+        
+        for game_stats_list in game_session_stats.values():
+            for stats in game_stats_list:
+                epoch_cumulative_reward += stats.get('cumulative_reward', 0.0)
+                epoch_cooperation_rates.append(stats.get('cooperation_rate', 0.0))
+        
+        # Track epoch-level metrics
+        avg_cooperation_rate = np.mean(epoch_cooperation_rates) if epoch_cooperation_rates else 0.0
+        self.epoch_rewards.append(epoch_cumulative_reward)
+        self.epoch_cooperation_rates.append(avg_cooperation_rate)
+        
         epoch_results = {
             'total_loss': loss_dict['total_loss'].item(),
             'mixed_batch_loss': mixed_batch_loss_record,
             'per_game_losses': per_game_losses,
             'game_session_stats': game_session_stats,
             'num_sessions_per_game': {game: len(stats) for game, stats in game_session_stats.items()},
-            'total_sessions': len(all_training_data)
+            'total_sessions': len(all_training_data),
+            'epoch_cumulative_reward': epoch_cumulative_reward,
+            'epoch_average_cooperation_rate': avg_cooperation_rate
         }
         
         # Update adaptive loss if applicable
@@ -899,15 +937,28 @@ class GameTrainer:
         
         # Average session statistics
         avg_stats = {}
+        epoch_cumulative_reward = 0.0
+        epoch_cooperation_rates = []
+        
         if session_stats:
             for key in session_stats[0].keys():
                 if isinstance(session_stats[0][key], (int, float)):
                     avg_stats[key] = np.mean([stats[key] for stats in session_stats])
+            
+            # Extract reward and cooperation metrics for epoch tracking
+            epoch_cumulative_reward = sum([stats.get('cumulative_reward', 0.0) for stats in session_stats])
+            epoch_cooperation_rates = [stats.get('cooperation_rate', 0.0) for stats in session_stats]
+        
+        # Track epoch-level metrics
+        self.epoch_rewards.append(epoch_cumulative_reward)
+        self.epoch_cooperation_rates.append(np.mean(epoch_cooperation_rates) if epoch_cooperation_rates else 0.0)
         
         return {
             **avg_losses,
             'session_stats': avg_stats,
-            'num_sessions': len(epoch_losses)
+            'num_sessions': len(epoch_losses),
+            'epoch_cumulative_reward': epoch_cumulative_reward,
+            'epoch_average_cooperation_rate': np.mean(epoch_cooperation_rates) if epoch_cooperation_rates else 0.0
         }
     
     def _update_metrics(self, epoch_results: Dict[str, Any], epoch: int):
@@ -998,11 +1049,29 @@ class GameTrainer:
                 'opponent_policy_history': self.loss_analyzer.loss_history.get('opponent_policy', [])
             }
         
+        # Calculate reward and cooperation statistics
+        reward_stats = {
+            'cumulative_rewards_per_epoch': self.epoch_rewards,
+            'average_reward_per_epoch': [r / max(1, self.config.__dict__.get('num_games_per_partner', 1)) for r in self.epoch_rewards],
+            'total_cumulative_reward': sum(self.epoch_rewards),
+            'mean_reward_across_epochs': np.mean(self.epoch_rewards) if self.epoch_rewards else 0.0,
+            'final_epoch_reward': self.epoch_rewards[-1] if self.epoch_rewards else 0.0
+        }
+        
+        cooperation_stats = {
+            'cooperation_rates_per_epoch': self.epoch_cooperation_rates,
+            'mean_cooperation_rate': np.mean(self.epoch_cooperation_rates) if self.epoch_cooperation_rates else 0.0,
+            'final_cooperation_rate': self.epoch_cooperation_rates[-1] if self.epoch_cooperation_rates else 0.0,
+            'cooperation_trend': 'increasing' if len(self.epoch_cooperation_rates) > 1 and self.epoch_cooperation_rates[-1] > self.epoch_cooperation_rates[0] else 'decreasing' if len(self.epoch_cooperation_rates) > 1 else 'stable'
+        }
+        
         return {
             'total_epochs': self.current_epoch + 1,
             'best_loss': self.best_loss,
             'convergence_info': convergence_info,
             'loss_statistics': loss_stats,
+            'reward_statistics': reward_stats,
+            'cooperation_statistics': cooperation_stats,
             'final_weights': {
                 'alpha': self.loss_fn.alpha,
                 'gamma': self.loss_fn.gamma,
@@ -1156,12 +1225,83 @@ class GameTrainer:
         summary_lines.append(f"Total Epochs: {training_results['final_metrics']['total_epochs']}")
         summary_lines.append(f"Best Loss: {training_results['final_metrics']['best_loss']:.6f}")
         
+        # Reward statistics
+        if 'reward_statistics' in training_results['final_metrics']:
+            reward_stats = training_results['final_metrics']['reward_statistics']
+            summary_lines.append("\n=== REWARD PERFORMANCE ===")
+            summary_lines.append(f"Total Cumulative Reward: {reward_stats['total_cumulative_reward']:.2f}")
+            summary_lines.append(f"Mean Reward per Epoch: {reward_stats['mean_reward_across_epochs']:.2f}")
+            summary_lines.append(f"Final Epoch Reward: {reward_stats['final_epoch_reward']:.2f}")
+            
+            # Show trend over last few epochs if available
+            if len(reward_stats['cumulative_rewards_per_epoch']) >= 5:
+                recent_rewards = reward_stats['cumulative_rewards_per_epoch'][-5:]
+                summary_lines.append(f"Last 5 Epochs Rewards: {[f'{r:.2f}' for r in recent_rewards]}")
+        
+        # Cooperation statistics
+        if 'cooperation_statistics' in training_results['final_metrics']:
+            coop_stats = training_results['final_metrics']['cooperation_statistics']
+            summary_lines.append("\n=== COOPERATION BEHAVIOR ===")
+            summary_lines.append(f"Mean Cooperation Rate: {coop_stats['mean_cooperation_rate']:.3f}")
+            summary_lines.append(f"Final Cooperation Rate: {coop_stats['final_cooperation_rate']:.3f}")
+            summary_lines.append(f"Cooperation Trend: {coop_stats['cooperation_trend']}")
+            
+            # Show trend over last few epochs if available
+            if len(coop_stats['cooperation_rates_per_epoch']) >= 5:
+                recent_coop = coop_stats['cooperation_rates_per_epoch'][-5:]
+                summary_lines.append(f"Last 5 Epochs Cooperation: {[f'{c:.3f}' for c in recent_coop]}")
+        
         # Per-game performance if available
         if training_results['epoch_results']:
             last_epoch = training_results['epoch_results'][-1]
             if 'per_game_losses' in last_epoch:
-                summary_lines.append("\nFinal Per-Game Losses:")
+                summary_lines.append("\n=== FINAL PER-GAME LOSSES ===")
                 for game_name, losses in last_epoch['per_game_losses'].items():
                     summary_lines.append(f"  {game_name}: {losses.get('total_loss', 'N/A'):.6f}")
+        
+        return "\n".join(summary_lines)
+
+    def get_single_game_training_summary(self, training_results: Dict[str, Any]) -> str:
+        """
+        Generate a human-readable summary of single-game training results.
+        
+        Args:
+            training_results: Results from train_on_game()
+            
+        Returns:
+            Formatted summary string
+        """
+        summary_lines = []
+        summary_lines.append("=== SINGLE-GAME TRAINING SUMMARY ===")
+        summary_lines.append(f"Game: {training_results['game_name']}")
+        summary_lines.append(f"Opponents: {', '.join(training_results['opponents'])}")
+        summary_lines.append(f"Total Epochs: {training_results['final_metrics']['total_epochs']}")
+        summary_lines.append(f"Best Loss: {training_results['final_metrics']['best_loss']:.6f}")
+        
+        # Reward statistics
+        if 'reward_statistics' in training_results['final_metrics']:
+            reward_stats = training_results['final_metrics']['reward_statistics']
+            summary_lines.append("\n=== REWARD PERFORMANCE ===")
+            summary_lines.append(f"Total Cumulative Reward: {reward_stats['total_cumulative_reward']:.2f}")
+            summary_lines.append(f"Mean Reward per Epoch: {reward_stats['mean_reward_across_epochs']:.2f}")
+            summary_lines.append(f"Final Epoch Reward: {reward_stats['final_epoch_reward']:.2f}")
+            
+            # Show trend over last few epochs if available
+            if len(reward_stats['cumulative_rewards_per_epoch']) >= 5:
+                recent_rewards = reward_stats['cumulative_rewards_per_epoch'][-5:]
+                summary_lines.append(f"Last 5 Epochs Rewards: {[f'{r:.2f}' for r in recent_rewards]}")
+        
+        # Cooperation statistics
+        if 'cooperation_statistics' in training_results['final_metrics']:
+            coop_stats = training_results['final_metrics']['cooperation_statistics']
+            summary_lines.append("\n=== COOPERATION BEHAVIOR ===")
+            summary_lines.append(f"Mean Cooperation Rate: {coop_stats['mean_cooperation_rate']:.3f}")
+            summary_lines.append(f"Final Cooperation Rate: {coop_stats['final_cooperation_rate']:.3f}")
+            summary_lines.append(f"Cooperation Trend: {coop_stats['cooperation_trend']}")
+            
+            # Show trend over last few epochs if available
+            if len(coop_stats['cooperation_rates_per_epoch']) >= 5:
+                recent_coop = coop_stats['cooperation_rates_per_epoch'][-5:]
+                summary_lines.append(f"Last 5 Epochs Cooperation: {[f'{c:.3f}' for c in recent_coop]}")
         
         return "\n".join(summary_lines)
