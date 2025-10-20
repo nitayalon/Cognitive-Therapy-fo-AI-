@@ -115,32 +115,30 @@ class GameSession:
         # Network forward pass - enable gradients during training, disable during evaluation
         if self.training_mode:
             # Enable gradients for training
-            policy_logits, opponent_coop_prob, value_estimate, new_hidden = self.network.forward(
+            policy_logits, opponent_policy_logits, value_estimate, new_hidden = self.network.forward(
                 state_tensor, hidden
             )
             
-            # Convert cooperation probability to action logits for CrossEntropyLoss
-            # opponent_coop_prob: (batch_size, 1) with values in [0, 1]
-            # Convert to action logits: (batch_size, 2) for [Cooperate, Defect]
-            opponent_defect_prob = 1.0 - opponent_coop_prob  # Probability of defection
+            # Convert policy logits to action logits for backward compatibility
+            # opponent_policy_logits: (batch_size, 2) with raw logits for [defect, cooperate]
+            # Convert to action logits: (batch_size, 2) for [Cooperate, Defect] (swapped order)
             opponent_action_logits = torch.cat([
-                torch.log(opponent_coop_prob + 1e-8),    # Log prob of cooperation (action 0)
-                torch.log(opponent_defect_prob + 1e-8)   # Log prob of defection (action 1)  
+                opponent_policy_logits[:, 1:2],  # Cooperation logit (action 0)  
+                opponent_policy_logits[:, 0:1]   # Defection logit (action 1)
             ], dim=1)
         else:
             # Disable gradients for evaluation
             with torch.no_grad():
-                policy_logits, opponent_coop_prob, value_estimate, new_hidden = self.network.forward(
+                policy_logits, opponent_policy_logits, value_estimate, new_hidden = self.network.forward(
                     state_tensor, hidden
                 )
                 
-                # Convert cooperation probability to action logits for CrossEntropyLoss
-                # opponent_coop_prob: (batch_size, 1) with values in [0, 1]
-                # Convert to action logits: (batch_size, 2) for [Cooperate, Defect]
-                opponent_defect_prob = 1.0 - opponent_coop_prob  # Probability of defection
+                # Convert policy logits to action logits for backward compatibility
+                # opponent_policy_logits: (batch_size, 2) with raw logits for [defect, cooperate]
+                # Convert to action logits: (batch_size, 2) for [Cooperate, Defect] (swapped order)
                 opponent_action_logits = torch.cat([
-                    torch.log(opponent_coop_prob + 1e-8),    # Log prob of cooperation (action 0)
-                    torch.log(opponent_defect_prob + 1e-8)   # Log prob of defection (action 1)  
+                    opponent_policy_logits[:, 1:2],  # Cooperation logit (action 0)
+                    opponent_policy_logits[:, 0:1]   # Defection logit (action 1)
                 ], dim=1)
         
         # Sample action from policy
@@ -170,7 +168,7 @@ class GameSession:
             'action_log_prob': action_log_prob,
             'policy_logits': policy_logits,
             'opponent_action_logits': opponent_action_logits,
-            'opponent_coop_prob': opponent_coop_prob,
+            'opponent_policy_logits': opponent_policy_logits,
             'value_estimate': value_estimate,
             'opponent_type_pred': torch.full_like(value_estimate, self.opponent.get_type_parameter() if self.opponent.get_type_parameter() is not None else 0.0),
             'opponent_type_true': self.opponent.get_type_parameter(),
@@ -195,7 +193,7 @@ class GameSession:
         # Stack network outputs
         policy_logits = torch.cat([data['policy_logits'] for data in self.session_data], dim=0)
         opponent_action_logits = torch.cat([data['opponent_action_logits'] for data in self.session_data], dim=0)
-        opponent_coop_probs = torch.cat([data['opponent_coop_prob'] for data in self.session_data], dim=0)
+        opponent_policy_logits = torch.cat([data['opponent_policy_logits'] for data in self.session_data], dim=0)
         value_estimates = torch.cat([data['value_estimate'] for data in self.session_data], dim=0)
         opponent_type_preds = torch.cat([data['opponent_type_pred'] for data in self.session_data], dim=0)
         
@@ -203,8 +201,13 @@ class GameSession:
         opponent_type_true = self.session_data[0]['opponent_type_true']
         if opponent_type_true is not None:
             opponent_type_tensor = torch.full((len(self.session_data), 1), opponent_type_true, dtype=torch.float32)
+            # Create true opponent policy tensor: [p_defect, p_cooperate] = [1-p_d, p_d]
+            p_d = opponent_type_true  # defection probability from opponent type
+            true_opponent_policy = torch.tensor([[1-p_d, p_d]], dtype=torch.float32).expand(len(self.session_data), -1)
         else:
             opponent_type_tensor = torch.zeros((len(self.session_data), 1), dtype=torch.float32)
+            # Default uniform policy if opponent type unknown
+            true_opponent_policy = torch.tensor([[0.5, 0.5]], dtype=torch.float32).expand(len(self.session_data), -1)
         
         # Session statistics
         cooperation_rate = sum(1 for data in self.session_data if data['player_action'] == Action.COOPERATE) / len(self.session_data)
@@ -218,10 +221,11 @@ class GameSession:
                 'rewards': rewards,
                 'policy_logits': policy_logits,
                 'opponent_action_logits': opponent_action_logits,
-                'opponent_coop_probs': opponent_coop_probs,
-                'value_estimates': value_estimates,
-                'opponent_type_preds': opponent_type_preds,
-                'opponent_type_true': opponent_type_tensor
+                'opponent_policy_logits': opponent_policy_logits,
+                'value_estimate': value_estimates,
+                'opponent_type_pred': opponent_type_preds,
+                'opponent_type_true': opponent_type_tensor,
+                'true_opponent_policy': true_opponent_policy
             },
             'session_stats': {
                 'cumulative_reward': self.cumulative_reward,
@@ -474,14 +478,14 @@ class GameTrainer:
         loss_dict = {
             'total_loss': torch.tensor(total_loss),
             'rl_loss': torch.tensor(loss_source.get('rl_loss', 0.0)),
-            'opponent_prediction_loss': torch.tensor(loss_source.get('opponent_prediction_loss', 0.0)),
+            'opponent_policy_loss': torch.tensor(loss_source.get('opponent_policy_loss', 0.0)),
             'alpha': loss_source.get('alpha', 1.0)
         }
         
         # Add normalized losses if available
         if 'rl_loss_normalized' in loss_source:
             loss_dict['rl_loss_normalized'] = torch.tensor(loss_source['rl_loss_normalized'])
-            loss_dict['opponent_prediction_loss_normalized'] = torch.tensor(loss_source['opponent_prediction_loss_normalized'])
+            loss_dict['opponent_policy_loss_normalized'] = torch.tensor(loss_source['opponent_policy_loss_normalized'])
         
         self.loss_analyzer.record_loss(loss_dict, epoch)
         
@@ -512,7 +516,7 @@ class GameTrainer:
                 'tom_contribution': self.loss_analyzer.get_tom_contribution() if hasattr(self.loss_analyzer, 'get_tom_contribution') else 0.0,
                 'total_loss_history': self.loss_analyzer.loss_history.get('total', []),
                 'rl_loss_history': self.loss_analyzer.loss_history.get('rl', []),
-                'opponent_prediction_history': self.loss_analyzer.loss_history.get('opponent_prediction', [])
+                'opponent_policy_history': self.loss_analyzer.loss_history.get('opponent_policy', [])
             }
         
         # Add game-specific information
@@ -570,11 +574,12 @@ class GameTrainer:
             try:
                 loss_dict = self.loss_fn(
                     policy_logits=training_data['policy_logits'].to(self.device),
-                    opponent_coop_probs=training_data['opponent_coop_probs'].to(self.device),
-                    value_estimates=training_data['value_estimates'].to(self.device),
+                    opponent_policy_logits=training_data['opponent_policy_logits'].to(self.device),
+                    value_estimates=training_data['value_estimate'].to(self.device),
                     actions_taken=training_data['actions'].to(self.device),
                     rewards=training_data['rewards'].to(self.device),
-                    opponent_actions=training_data['opponent_actions'].to(self.device)
+                    opponent_actions=training_data['opponent_actions'].to(self.device),
+                    true_opponent_policy=training_data['true_opponent_policy'].to(self.device)
                 )
             except Exception as e:
                 self.logger.error(f"Loss calculation failed: {e}")
@@ -638,7 +643,7 @@ class GameTrainer:
         
         Args:
             games: Dictionary of game_name -> game_instance
-            game_weights: Dictionary of sampling weights for each game
+            game_weights: Dictionary of game weights (maintained for compatibility, no longer used for sampling)
             opponents: List of opponents to train against
             
         Returns:
@@ -653,34 +658,39 @@ class GameTrainer:
         # Shuffle opponents for this epoch
         random.shuffle(opponents)
         
-        # Generate training sessions across all games
+        # Generate training sessions across all games (deterministic coverage)
         for opponent in opponents:
-            # Sample games for this opponent based on weights
+            # Train on all games deterministically (no sampling)
             game_names = list(games.keys())
-            weights = [game_weights[name] for name in game_names]
+            # Note: game_weights no longer used for probabilistic sampling
             
-            # Each opponent plays sessions in multiple games
+            # Each opponent plays sessions in ALL games (deterministic coverage)
             for game_name in game_names:
-                # Probability of including this game for this opponent
-                if random.random() < game_weights[game_name]:
-                    game = games[game_name]
+                # Always train on every game - no probabilistic sampling
+                game = games[game_name]
+                
+                # Play session with this opponent on this game (training mode)
+                session = GameSession(game, opponent, self.network, self.config.num_games_per_partner, training_mode=True)
+                session_results = session.play_session(self.device)
+                
+                if session_results:
+                    # Annotate training data with game information
+                    training_data = session_results['training_data']
+                    training_data['game_name'] = game_name
+                    training_data['opponent_name'] = opponent.get_strategy_name()
                     
-                    # Play session with this opponent on this game (training mode)
-                    session = GameSession(game, opponent, self.network, self.config.num_games_per_partner, training_mode=True)
-                    session_results = session.play_session(self.device)
-                    
-                    if session_results:
-                        # Annotate training data with game information
-                        training_data = session_results['training_data']
-                        training_data['game_name'] = game_name
-                        training_data['opponent_name'] = opponent.get_strategy_name()
-                        
-                        all_training_data.append(training_data)
-                        game_session_stats[game_name].append(session_results['session_stats'])
+                    all_training_data.append(training_data)
+                    game_session_stats[game_name].append(session_results['session_stats'])
         
         if not all_training_data:
-            self.logger.warning("No training data generated in this epoch")
+            self.logger.warning("No training data generated in this epoch - this should not occur with deterministic game coverage")
             return {'total_loss': float('inf'), 'game_losses': {}}
+        
+        # Log training volume for monitoring
+        expected_sessions = len(opponents) * len(games)
+        actual_sessions = len(all_training_data)
+        self.logger.debug(f"Deterministic training: {actual_sessions}/{expected_sessions} sessions generated "
+                         f"({len(games)} games × {len(opponents)} opponents)")
         
         # Create mixed batches from all games
         mixed_batch = self._create_mixed_batch(all_training_data)
@@ -689,11 +699,12 @@ class GameTrainer:
         try:
             loss_dict = self.loss_fn(
                 policy_logits=mixed_batch['policy_logits'].to(self.device),
-                opponent_coop_probs=mixed_batch['opponent_coop_probs'].to(self.device),
-                value_estimates=mixed_batch['value_estimates'].to(self.device),
+                opponent_policy_logits=mixed_batch['opponent_policy_logits'].to(self.device),
+                value_estimates=mixed_batch['value_estimate'].to(self.device),
                 actions_taken=mixed_batch['actions'].to(self.device),
                 rewards=mixed_batch['rewards'].to(self.device),
-                opponent_actions=mixed_batch['opponent_actions'].to(self.device)
+                opponent_actions=mixed_batch['opponent_actions'].to(self.device),
+                true_opponent_policy=mixed_batch['true_opponent_policy'].to(self.device)
             )
         except Exception as e:
             self.logger.error(f"Mixed batch loss calculation failed: {e}")
@@ -767,8 +778,8 @@ class GameTrainer:
         
         # Initialize batch with first item structure
         batch = {}
-        tensor_keys = ['policy_logits', 'opponent_action_logits', 'opponent_coop_probs', 'value_estimates', 
-                      'opponent_type_preds', 'actions', 'rewards', 'opponent_actions', 'opponent_type_true']
+        tensor_keys = ['policy_logits', 'opponent_action_logits', 'opponent_policy_logits', 'value_estimate', 
+                      'opponent_type_pred', 'actions', 'rewards', 'opponent_actions', 'opponent_type_true', 'true_opponent_policy']
         
         for key in tensor_keys:
             tensors_to_concat = []
@@ -784,8 +795,8 @@ class GameTrainer:
                     # These should remain 1D after concatenation for loss functions
                     # Each session contributes (T,) -> concatenate to (total_T,)
                     batch[key] = torch.cat(tensors_to_concat, dim=0)
-                elif key in ['policy_logits', 'opponent_action_logits', 'opponent_coop_probs', 'value_estimates', 
-                           'opponent_type_preds', 'opponent_type_true']:
+                elif key in ['policy_logits', 'opponent_action_logits', 'opponent_policy_logits', 'value_estimate', 
+                           'opponent_type_pred', 'opponent_type_true', 'true_opponent_policy']:
                     # These should be 2D after concatenation 
                     # Each session contributes (T, features) -> concatenate to (total_T, features)
                     batch[key] = torch.cat(tensors_to_concat, dim=0)
@@ -833,11 +844,12 @@ class GameTrainer:
                 with torch.no_grad():
                     loss_dict = self.loss_fn(
                         policy_logits=game_batch['policy_logits'].to(self.device),
-                        opponent_coop_probs=game_batch['opponent_coop_probs'].to(self.device),
-                        value_estimates=game_batch['value_estimates'].to(self.device),
+                        opponent_policy_logits=game_batch['opponent_policy_logits'].to(self.device),
+                        value_estimates=game_batch['value_estimate'].to(self.device),
                         actions_taken=game_batch['actions'].to(self.device),
                         rewards=game_batch['rewards'].to(self.device),
-                        opponent_actions=game_batch['opponent_actions'].to(self.device)
+                        opponent_actions=game_batch['opponent_actions'].to(self.device),
+                        true_opponent_policy=game_batch['true_opponent_policy'].to(self.device)
                     )
                 
                 # Handle multi-element tensors properly
@@ -913,9 +925,9 @@ class GameTrainer:
         loss_data = {
             'total_loss': epoch_results.get('total_loss', 0.0),
             'rl_loss': loss_source.get('rl_loss', 0.0),
-            'opponent_prediction_loss': loss_source.get('opponent_prediction_loss', 0.0),
+            'opponent_policy_loss': loss_source.get('opponent_policy_loss', 0.0),
             'rl_loss_normalized': loss_source.get('rl_loss_normalized', 0.0),
-            'opponent_prediction_loss_normalized': loss_source.get('opponent_prediction_loss_normalized', 0.0)
+            'opponent_policy_loss_normalized': loss_source.get('opponent_policy_loss_normalized', 0.0)
         }
         
         # Convert to tensors for loss_analyzer
@@ -983,7 +995,7 @@ class GameTrainer:
                 'tom_contribution': self.loss_analyzer.get_tom_contribution() if hasattr(self.loss_analyzer, 'get_tom_contribution') else 0.0,
                 'total_loss_history': self.loss_analyzer.loss_history.get('total', []),
                 'rl_loss_history': self.loss_analyzer.loss_history.get('rl', []),
-                'opponent_prediction_history': self.loss_analyzer.loss_history.get('opponent_prediction', [])
+                'opponent_policy_history': self.loss_analyzer.loss_history.get('opponent_policy', [])
             }
         
         return {

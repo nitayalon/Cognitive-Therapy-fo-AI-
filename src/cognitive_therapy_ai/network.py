@@ -74,14 +74,14 @@ class GameLSTM(nn.Module):
             nn.Linear(hidden_size // 2, num_actions)
         )
         
-        # Opponent prediction head - outputs probability of opponent cooperation
-        # This creates ToM inductive bias for understanding opponent behavior
-        self.opponent_prediction_head = nn.Sequential(
+        # Opponent policy prediction head - outputs logits for opponent policy distribution
+        # This creates ToM inductive bias for understanding opponent behavior patterns
+        self.opponent_policy_head = nn.Sequential(
             nn.Linear(hidden_size, hidden_size // 2),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_size // 2, 1),
-            nn.Sigmoid()  # Output probability of cooperation [0, 1]
+            nn.Linear(hidden_size // 2, 2),  # 2 actions: [defect, cooperate]
+            # No activation - raw logits for policy distribution
         )
         
         # Value function head - estimates state value for advantage calculation
@@ -118,7 +118,7 @@ class GameLSTM(nn.Module):
             hidden: Optional hidden state tuple (h_0, c_0)
             
         Returns:
-            Tuple of (policy_logits, opponent_coop_prob, value_estimate, new_hidden)
+            Tuple of (policy_logits, opponent_policy_logits, value_estimate, new_hidden)
         """
         # LSTM forward pass
         lstm_out, new_hidden = self.lstm(x, hidden)
@@ -131,10 +131,10 @@ class GameLSTM(nn.Module):
         
         # Multi-task outputs
         policy_logits = self.policy_head(last_output)
-        opponent_coop_prob = self.opponent_prediction_head(last_output)
+        opponent_policy_logits = self.opponent_policy_head(last_output)
         value_estimate = self.value_head(last_output)
         
-        return policy_logits, opponent_coop_prob, value_estimate, new_hidden
+        return policy_logits, opponent_policy_logits, value_estimate, new_hidden
     
     def get_action_probabilities(self, x: torch.Tensor, hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None) -> torch.Tensor:
         """
@@ -199,12 +199,12 @@ class GameLSTM(nn.Module):
         Returns:
             Dictionary with all predictions
         """
-        policy_logits, opponent_coop_prob, value_estimate, new_hidden = self.forward(x, hidden)
+        policy_logits, opponent_policy_logits, value_estimate, new_hidden = self.forward(x, hidden)
         
         return {
             'policy_probs': F.softmax(policy_logits, dim=-1),
             'policy_logits': policy_logits,
-            'opponent_coop_prob': opponent_coop_prob,
+            'opponent_policy_logits': opponent_policy_logits,
             'value_estimate': value_estimate,
             'hidden': new_hidden
         }
@@ -278,7 +278,7 @@ class NetworkManager:
             
             return {
                 'policy_probs': predictions['policy_probs'].cpu().numpy(),
-                'opponent_coop_prob': predictions['opponent_coop_prob'].cpu().numpy(),
+                'opponent_policy_logits': predictions['opponent_policy_logits'].cpu().numpy(),
                 'value_estimate': predictions['value_estimate'].cpu().numpy(),
                 'hidden': predictions['hidden']
             }

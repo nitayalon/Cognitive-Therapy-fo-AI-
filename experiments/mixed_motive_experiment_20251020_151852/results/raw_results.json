@@ -1,0 +1,4344 @@
+{
+  "training_games": [
+    "hawk-dove",
+    "battle-of-sexes",
+    "prisoners-dilemma"
+  ],
+  "test_game": "stag-hunt",
+  "opponent_probabilities": [
+    0.3,
+    0.7
+  ],
+  "network_config": {
+    "hidden_size": 128,
+    "num_layers": 2,
+    "dropout": 0.1,
+    "input_size": 5
+  },
+  "training_config": {
+    "num_games_per_partner": 20,
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "max_epochs": 1000,
+    "convergence_threshold": 1e-06,
+    "patience": 50,
+    "reward_loss_weight": 1.0,
+    "action_prediction_loss_weight": 1.0,
+    "type_prediction_loss_weight": 1.0
+  },
+  "training_results": {
+    "games": [
+      "hawk-dove",
+      "battle-of-sexes",
+      "prisoners-dilemma"
+    ],
+    "game_weights": {
+      "hawk-dove": 0.3333333333333333,
+      "battle-of-sexes": 0.3333333333333333,
+      "prisoners-dilemma": 0.3333333333333333
+    },
+    "opponents": [
+      "Probabilistic-p0.30",
+      "Probabilistic-p0.70"
+    ],
+    "epoch_results": [
+      {
+        "total_loss": 2.0,
+        "mixed_batch_loss": {
+          "total_loss": 2.0,
+          "rl_loss": 18.41650390625,
+          "rl_loss_normalized": 1.0,
+          "opponent_policy_loss": 0.6958894729614258,
+          "opponent_policy_loss_normalized": 1.0,
+          "advantages_mean": 26.59444236755371,
+          "advantages_std": 11.2958345413208,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 18.41650390625,
+            "op_loss_scale": 0.6958894729614258
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.9462289810180664,
+            "rl_loss": 16.52968406677246,
+            "rl_loss_normalized": 0.9460077881813049,
+            "opponent_policy_loss": 0.6961973309516907,
+            "opponent_policy_loss_normalized": 1.0002211332321167,
+            "advantages_mean": 23.85067367553711,
+            "advantages_std": 11.186179161071777,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 17.473094940185547,
+              "op_loss_scale": 0.6960433721542358
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.5922805070877075,
+            "rl_loss": 8.641441345214844,
+            "rl_loss_normalized": 0.5947633385658264,
+            "opponent_policy_loss": 0.693454384803772,
+            "opponent_policy_loss_normalized": 0.9975171685218811,
+            "advantages_mean": 12.448751449584961,
+            "advantages_std": 4.910706520080566,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.529210090637207,
+              "op_loss_scale": 0.6951804161071777
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.1943070888519287,
+            "rl_loss": 18.48643684387207,
+            "rl_loss_normalized": 1.191250205039978,
+            "opponent_policy_loss": 0.6980167627334595,
+            "opponent_policy_loss_normalized": 1.0030568838119507,
+            "advantages_mean": 26.759857177734375,
+            "advantages_std": 8.763705253601074,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.518516540527344,
+              "op_loss_scale": 0.6958894729614258
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 5.0,
+              "average_reward": 0.25,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 65.0,
+              "average_reward": 3.25,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 15.0,
+              "average_reward": 0.75,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.15,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 63.0,
+              "average_reward": 3.1500000953674316,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.0874509811401367,
+        "mixed_batch_loss": {
+          "total_loss": 2.0874509811401367,
+          "rl_loss": 17.013105392456055,
+          "rl_loss_normalized": 1.0755919218063354,
+          "opponent_policy_loss": 0.7062360644340515,
+          "opponent_policy_loss_normalized": 1.0118591785430908,
+          "advantages_mean": 24.454050064086914,
+          "advantages_std": 12.198221206665039,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.817434310913086,
+            "op_loss_scale": 0.6979588270187378
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.8250484466552734,
+            "rl_loss": 12.392328262329102,
+            "rl_loss_normalized": 0.8127937316894531,
+            "opponent_policy_loss": 0.7082479596138,
+            "opponent_policy_loss_normalized": 1.0122547149658203,
+            "advantages_mean": 17.762107849121094,
+            "advantages_std": 10.715428352355957,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.246583938598633,
+              "op_loss_scale": 0.6996736526489258
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.4863654375076294,
+            "rl_loss": 6.868525505065918,
+            "rl_loss_normalized": 0.48887279629707336,
+            "opponent_policy_loss": 0.6976278424263,
+            "opponent_policy_loss_normalized": 0.9974926710128784,
+            "advantages_mean": 9.8784761428833,
+            "advantages_std": 6.151476860046387,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.049718856811523,
+              "op_loss_scale": 0.699381411075592
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.0681495666503906,
+            "rl_loss": 14.880514144897461,
+            "rl_loss_normalized": 1.051361322402954,
+            "opponent_policy_loss": 0.7128323316574097,
+            "opponent_policy_loss_normalized": 1.016788125038147,
+            "advantages_mean": 21.470592498779297,
+            "advantages_std": 14.004253387451172,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.153568267822266,
+              "op_loss_scale": 0.701062798500061
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 51.0,
+              "average_reward": 2.549999952316284,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 31.0,
+              "average_reward": 1.5499999523162842,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 14.0,
+              "average_reward": 0.699999988079071,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 65.0,
+              "average_reward": 3.25,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 27.0,
+              "average_reward": 1.350000023841858,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.336545705795288,
+        "mixed_batch_loss": {
+          "total_loss": 2.336545705795288,
+          "rl_loss": 19.780487060546875,
+          "rl_loss_normalized": 1.3384382724761963,
+          "opponent_policy_loss": 0.6995704770088196,
+          "opponent_policy_loss_normalized": 0.9981074333190918,
+          "advantages_mean": 28.627056121826172,
+          "advantages_std": 10.4632568359375,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.77878189086914,
+            "op_loss_scale": 0.7008969783782959
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.2298760414123535,
+            "rl_loss": 18.592941284179688,
+            "rl_loss_normalized": 1.2264312505722046,
+            "opponent_policy_loss": 0.7035808563232422,
+            "opponent_policy_loss_normalized": 1.0034449100494385,
+            "advantages_mean": 26.885034561157227,
+            "advantages_std": 9.004449844360352,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.160198211669922,
+              "op_loss_scale": 0.7011653780937195
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.5896527767181396,
+            "rl_loss": 8.6673002243042,
+            "rl_loss_normalized": 0.594875693321228,
+            "opponent_policy_loss": 0.6971391439437866,
+            "opponent_policy_loss_normalized": 0.9947770833969116,
+            "advantages_mean": 12.51296615600586,
+            "advantages_std": 5.1827569007873535,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.569934844970703,
+              "op_loss_scale": 0.7007993459701538
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.076519727706909,
+            "rl_loss": 15.85393238067627,
+            "rl_loss_normalized": 1.0801937580108643,
+            "opponent_policy_loss": 0.6979914903640747,
+            "opponent_policy_loss_normalized": 0.9963259696960449,
+            "advantages_mean": 23.05613136291504,
+            "advantages_std": 13.31074333190918,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.676934242248535,
+              "op_loss_scale": 0.7005653977394104
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 50.0,
+              "average_reward": 2.5,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 47.0,
+              "average_reward": 2.3499999046325684,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 25.0,
+              "average_reward": 1.25,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.5,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 59.0,
+              "average_reward": 2.950000047683716,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 35.0,
+              "average_reward": 1.75,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.279738664627075,
+        "mixed_batch_loss": {
+          "total_loss": 2.279738664627075,
+          "rl_loss": 19.355730056762695,
+          "rl_loss_normalized": 1.2872204780578613,
+          "opponent_policy_loss": 0.6948906183242798,
+          "opponent_policy_loss_normalized": 0.9925181269645691,
+          "advantages_mean": 27.961620330810547,
+          "advantages_std": 11.187216758728027,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.03684139251709,
+            "op_loss_scale": 0.7001289129257202
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.0448970794677734,
+            "rl_loss": 15.880441665649414,
+            "rl_loss_normalized": 1.051887035369873,
+            "opponent_policy_loss": 0.6948614716529846,
+            "opponent_policy_loss_normalized": 0.9930101633071899,
+            "advantages_mean": 23.009077072143555,
+            "advantages_std": 17.026084899902344,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.097098350524902,
+              "op_loss_scale": 0.6997526288032532
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.5967928171157837,
+            "rl_loss": 8.885769844055176,
+            "rl_loss_normalized": 0.605173647403717,
+            "opponent_policy_loss": 0.6934729814529419,
+            "opponent_policy_loss_normalized": 0.9916191697120667,
+            "advantages_mean": 12.821477890014648,
+            "advantages_std": 6.358670711517334,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.683009147644043,
+              "op_loss_scale": 0.6993339657783508
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.1892614364624023,
+            "rl_loss": 17.749650955200195,
+            "rl_loss_normalized": 1.1932799816131592,
+            "opponent_policy_loss": 0.6963370442390442,
+            "opponent_policy_loss_normalized": 0.9959813952445984,
+            "advantages_mean": 25.605337142944336,
+            "advantages_std": 11.001611709594727,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.874673843383789,
+              "op_loss_scale": 0.6991466283798218
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 66.0,
+              "average_reward": 3.299999952316284,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 32.0,
+              "average_reward": 1.600000023841858,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 24.0,
+              "average_reward": 1.2000000476837158,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 58.0,
+              "average_reward": 2.9000000953674316,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 38.0,
+              "average_reward": 1.899999976158142,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.438105821609497,
+        "mixed_batch_loss": {
+          "total_loss": 2.438105821609497,
+          "rl_loss": 22.127296447753906,
+          "rl_loss_normalized": 1.4461058378219604,
+          "opponent_policy_loss": 0.6932068467140198,
+          "opponent_policy_loss_normalized": 0.9919999837875366,
+          "advantages_mean": 32.04218673706055,
+          "advantages_std": 9.827280044555664,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.301298141479492,
+            "op_loss_scale": 0.6987972259521484
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.322927236557007,
+            "rl_loss": 20.749370574951172,
+            "rl_loss_normalized": 1.329749584197998,
+            "opponent_policy_loss": 0.6937512755393982,
+            "opponent_policy_loss_normalized": 0.993177592754364,
+            "advantages_mean": 29.624094009399414,
+            "advantages_std": 8.94739055633545,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.603968620300293,
+              "op_loss_scale": 0.698516845703125
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.7076079845428467,
+            "rl_loss": 10.949897766113281,
+            "rl_loss_normalized": 0.7129296064376831,
+            "opponent_policy_loss": 0.6945942640304565,
+            "opponent_policy_loss_normalized": 0.9946784377098083,
+            "advantages_mean": 15.849352836608887,
+            "advantages_std": 5.783978462219238,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.359017372131348,
+              "op_loss_scale": 0.698310375213623
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.1693384647369385,
+            "rl_loss": 18.279094696044922,
+            "rl_loss_normalized": 1.1789145469665527,
+            "opponent_policy_loss": 0.6912749409675598,
+            "opponent_policy_loss_normalized": 0.9904239177703857,
+            "advantages_mean": 26.84983253479004,
+            "advantages_std": 10.641791343688965,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.505021095275879,
+              "op_loss_scale": 0.6979586482048035
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 24.0,
+              "average_reward": 1.2000000476837158,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 70.0,
+              "average_reward": 3.5,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 30.0,
+              "average_reward": 1.5,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 29.0,
+              "average_reward": 1.4500000476837158,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 42.0,
+              "average_reward": 2.0999999046325684,
+              "cooperation_rate": 0.25,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 54.0,
+              "average_reward": 2.700000047683716,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 1.9906413555145264,
+        "mixed_batch_loss": {
+          "total_loss": 1.9906413555145264,
+          "rl_loss": 15.447360038757324,
+          "rl_loss_normalized": 0.996457576751709,
+          "opponent_policy_loss": 0.6936973929405212,
+          "opponent_policy_loss_normalized": 0.9941837787628174,
+          "advantages_mean": 22.326459884643555,
+          "advantages_std": 10.14160442352295,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.502275466918945,
+            "op_loss_scale": 0.6977556943893433
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.5504505634307861,
+            "rl_loss": 8.451944351196289,
+            "rl_loss_normalized": 0.5567153692245483,
+            "opponent_policy_loss": 0.6931775808334351,
+            "opponent_policy_loss_normalized": 0.993735134601593,
+            "advantages_mean": 12.198699951171875,
+            "advantages_std": 11.088595390319824,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.181805610656738,
+              "op_loss_scale": 0.6975476145744324
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.5370773077011108,
+            "rl_loss": 8.044925689697266,
+            "rl_loss_normalized": 0.5409623980522156,
+            "opponent_policy_loss": 0.6947149038314819,
+            "opponent_policy_loss_normalized": 0.9961149096488953,
+            "advantages_mean": 11.626625061035156,
+            "advantages_std": 4.874942779541016,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.871506690979004,
+              "op_loss_scale": 0.6974244713783264
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.0088720321655273,
+            "rl_loss": 15.099444389343262,
+            "rl_loss_normalized": 1.0146790742874146,
+            "opponent_policy_loss": 0.6931995749473572,
+            "opponent_policy_loss_normalized": 0.9941930770874023,
+            "advantages_mean": 21.97088623046875,
+            "advantages_std": 11.80792236328125,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.881004333496094,
+              "op_loss_scale": 0.6972484588623047
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 49.0,
+              "average_reward": 2.450000047683716,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 14.0,
+              "average_reward": 0.699999988079071,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.55,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 21.0,
+              "average_reward": 1.0499999523162842,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 61.0,
+              "average_reward": 3.049999952316284,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 30.0,
+              "average_reward": 1.5,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.337588310241699,
+        "mixed_batch_loss": {
+          "total_loss": 2.337588310241699,
+          "rl_loss": 20.247297286987305,
+          "rl_loss_normalized": 1.341266393661499,
+          "opponent_policy_loss": 0.6945773959159851,
+          "opponent_policy_loss_normalized": 0.9963218569755554,
+          "advantages_mean": 29.40073013305664,
+          "advantages_std": 13.570645332336426,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.095656394958496,
+            "op_loss_scale": 0.6971415877342224
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.8654043674468994,
+            "rl_loss": 12.9840726852417,
+            "rl_loss_normalized": 0.8647722601890564,
+            "opponent_policy_loss": 0.6975998282432556,
+            "opponent_policy_loss_normalized": 1.0006320476531982,
+            "advantages_mean": 18.567834854125977,
+            "advantages_std": 18.38395118713379,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.01444149017334,
+              "op_loss_scale": 0.6971592307090759
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.6951284408569336,
+            "rl_loss": 10.414053916931152,
+            "rl_loss_normalized": 0.701563835144043,
+            "opponent_policy_loss": 0.6925013661384583,
+            "opponent_policy_loss_normalized": 0.9935646057128906,
+            "advantages_mean": 15.053037643432617,
+            "advantages_std": 7.055520534515381,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.844057083129883,
+              "op_loss_scale": 0.696986734867096
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.2485029697418213,
+            "rl_loss": 18.777833938598633,
+            "rl_loss_normalized": 1.2531464099884033,
+            "opponent_policy_loss": 0.6936309933662415,
+            "opponent_policy_loss_normalized": 0.995356559753418,
+            "advantages_mean": 27.869510650634766,
+            "advantages_std": 13.45415210723877,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.984548568725586,
+              "op_loss_scale": 0.6968668699264526
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 65.0,
+              "average_reward": 3.25,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 18.0,
+              "average_reward": 0.8999999761581421,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 36.0,
+              "average_reward": 1.7999999523162842,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 25.0,
+              "average_reward": 1.25,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 70.0,
+              "average_reward": 3.5,
+              "cooperation_rate": 0.25,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 40.0,
+              "average_reward": 2.0,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.2981228828430176,
+        "mixed_batch_loss": {
+          "total_loss": 2.2981228828430176,
+          "rl_loss": 19.714143753051758,
+          "rl_loss_normalized": 1.301466464996338,
+          "opponent_policy_loss": 0.6944539546966553,
+          "opponent_policy_loss_normalized": 0.9966564774513245,
+          "advantages_mean": 28.27069091796875,
+          "advantages_std": 10.809103012084961,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.147638320922852,
+            "op_loss_scale": 0.6967836618423462
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.564300537109375,
+            "rl_loss": 8.469419479370117,
+            "rl_loss_normalized": 0.5674641132354736,
+            "opponent_policy_loss": 0.6945036053657532,
+            "opponent_policy_loss_normalized": 0.9968364834785461,
+            "advantages_mean": 12.167341232299805,
+            "advantages_std": 6.008054733276367,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.925030708312988,
+              "op_loss_scale": 0.6967076659202576
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.8100333213806152,
+            "rl_loss": 12.060752868652344,
+            "rl_loss_normalized": 0.8131227493286133,
+            "opponent_policy_loss": 0.6944838166236877,
+            "opponent_policy_loss_normalized": 0.9969106316566467,
+            "advantages_mean": 17.39203453063965,
+            "advantages_std": 5.553915023803711,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.832634925842285,
+              "op_loss_scale": 0.6966359615325928
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.5779881477355957,
+            "rl_loss": 23.90041732788086,
+            "rl_loss_normalized": 1.5811333656311035,
+            "opponent_policy_loss": 0.6943743824958801,
+            "opponent_policy_loss_normalized": 0.9968547224998474,
+            "advantages_mean": 34.38075256347656,
+            "advantages_std": 10.953393936157227,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.116003036499023,
+              "op_loss_scale": 0.6965652704238892
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": -6.0,
+              "average_reward": -0.30000001192092896,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.15,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 38.0,
+              "average_reward": 1.899999976158142,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.55,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 23.0,
+              "average_reward": 1.149999976158142,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 39.0,
+              "average_reward": 1.9500000476837158,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 45.0,
+              "average_reward": 2.25,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.5,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 67.0,
+              "average_reward": 3.3499999046325684,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.2098073959350586,
+        "mixed_batch_loss": {
+          "total_loss": 2.2098073959350586,
+          "rl_loss": 18.488130569458008,
+          "rl_loss_normalized": 1.2148706912994385,
+          "opponent_policy_loss": 0.6929287314414978,
+          "opponent_policy_loss_normalized": 0.9949367642402649,
+          "advantages_mean": 26.49871063232422,
+          "advantages_std": 8.52379322052002,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.218188285827637,
+            "op_loss_scale": 0.6964550614356995
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.9306150674819946,
+            "rl_loss": 14.214065551757812,
+            "rl_loss_normalized": 0.9358344078063965,
+            "opponent_policy_loss": 0.6927105188369751,
+            "opponent_policy_loss_normalized": 0.9947806596755981,
+            "advantages_mean": 20.638723373413086,
+            "advantages_std": 7.167446136474609,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.188654899597168,
+              "op_loss_scale": 0.6963449716567993
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.710715651512146,
+            "rl_loss": 10.706462860107422,
+            "rl_loss_normalized": 0.7108925580978394,
+            "opponent_policy_loss": 0.6962181329727173,
+            "opponent_policy_loss_normalized": 0.9998230934143066,
+            "advantages_mean": 15.248316764831543,
+            "advantages_std": 5.0883917808532715,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.060591697692871,
+              "op_loss_scale": 0.696341335773468
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.146214008331299,
+            "rl_loss": 17.476566314697266,
+            "rl_loss_normalized": 1.1552691459655762,
+            "opponent_policy_loss": 0.6898573637008667,
+            "opponent_policy_loss_normalized": 0.9909448623657227,
+            "advantages_mean": 25.037731170654297,
+            "advantages_std": 8.382624626159668,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.127701759338379,
+              "op_loss_scale": 0.6961612105369568
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 20.0,
+              "average_reward": 1.0,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 48.0,
+              "average_reward": 2.4000000953674316,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 24.0,
+              "average_reward": 1.2000000476837158,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 31.0,
+              "average_reward": 1.5499999523162842,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 59.0,
+              "average_reward": 2.950000047683716,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.0318639278411865,
+        "mixed_batch_loss": {
+          "total_loss": 2.0318639278411865,
+          "rl_loss": 15.66745376586914,
+          "rl_loss_normalized": 1.0346819162368774,
+          "opponent_policy_loss": 0.694145143032074,
+          "opponent_policy_loss_normalized": 0.9971820712089539,
+          "advantages_mean": 22.908689498901367,
+          "advantages_std": 12.017314910888672,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.142290115356445,
+            "op_loss_scale": 0.6961067318916321
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.6795289516448975,
+            "rl_loss": 10.261860847473145,
+            "rl_loss_normalized": 0.6834926009178162,
+            "opponent_policy_loss": 0.6932733058929443,
+            "opponent_policy_loss_normalized": 0.9960362911224365,
+            "advantages_mean": 15.221466064453125,
+            "advantages_std": 14.91482162475586,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.0138578414917,
+              "op_loss_scale": 0.6960321664810181
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.7096517086029053,
+            "rl_loss": 10.628778457641602,
+            "rl_loss_normalized": 0.7132728695869446,
+            "opponent_policy_loss": 0.6934455633163452,
+            "opponent_policy_loss_normalized": 0.9963787794113159,
+            "advantages_mean": 15.477094650268555,
+            "advantages_std": 7.5539140701293945,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.901419639587402,
+              "op_loss_scale": 0.6959658265113831
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 1.9291541576385498,
+            "rl_loss": 13.825925827026367,
+            "rl_loss_normalized": 0.9295032024383545,
+            "opponent_policy_loss": 0.6957166790962219,
+            "opponent_policy_loss_normalized": 0.9996510148048401,
+            "advantages_mean": 20.011959075927734,
+            "advantages_std": 11.087626457214355,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.874532699584961,
+              "op_loss_scale": 0.6959595680236816
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 75.0,
+              "average_reward": 3.75,
+              "cooperation_rate": 0.2,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 5.0,
+              "average_reward": 0.25,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 29.0,
+              "average_reward": 1.4500000476837158,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 24.0,
+              "average_reward": 1.2000000476837158,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.05,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 52.0,
+              "average_reward": 2.5999999046325684,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 29.0,
+              "average_reward": 1.4500000476837158,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.258016347885132,
+        "mixed_batch_loss": {
+          "total_loss": 2.258016347885132,
+          "rl_loss": 18.9144287109375,
+          "rl_loss_normalized": 1.2632300853729248,
+          "opponent_policy_loss": 0.6922407746315002,
+          "opponent_policy_loss_normalized": 0.994786262512207,
+          "advantages_mean": 27.352012634277344,
+          "advantages_std": 13.004389762878418,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.973066329956055,
+            "op_loss_scale": 0.6958688497543335
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.928792953491211,
+            "rl_loss": 13.9246826171875,
+            "rl_loss_normalized": 0.931535005569458,
+            "opponent_policy_loss": 0.6939144134521484,
+            "opponent_policy_loss_normalized": 0.9972580075263977,
+            "advantages_mean": 20.460142135620117,
+            "advantages_std": 17.21261978149414,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.948104858398438,
+              "op_loss_scale": 0.6958223581314087
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.6838490962982178,
+            "rl_loss": 10.222827911376953,
+            "rl_loss_normalized": 0.6889526844024658,
+            "opponent_policy_loss": 0.6921870708465576,
+            "opponent_policy_loss_normalized": 0.9948964715003967,
+            "advantages_mean": 14.705782890319824,
+            "advantages_std": 7.692941188812256,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.838214874267578,
+              "op_loss_scale": 0.6957377791404724
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.09194016456604,
+            "rl_loss": 16.34679412841797,
+            "rl_loss_normalized": 1.0991287231445312,
+            "opponent_policy_loss": 0.690621018409729,
+            "opponent_policy_loss_normalized": 0.9928115010261536,
+            "advantages_mean": 23.484439849853516,
+            "advantages_std": 11.624259948730469,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.872501373291016,
+              "op_loss_scale": 0.6956214904785156
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 83.0,
+              "average_reward": 4.150000095367432,
+              "cooperation_rate": 0.25,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 10.0,
+              "average_reward": 0.5,
+              "cooperation_rate": 0.75,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 28.0,
+              "average_reward": 1.399999976158142,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 30.0,
+              "average_reward": 1.5,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 59.0,
+              "average_reward": 2.950000047683716,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 37.0,
+              "average_reward": 1.850000023841858,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.2696943283081055,
+        "mixed_batch_loss": {
+          "total_loss": 2.2696943283081055,
+          "rl_loss": 19.05107879638672,
+          "rl_loss_normalized": 1.2730118036270142,
+          "opponent_policy_loss": 0.6932615637779236,
+          "opponent_policy_loss_normalized": 0.9966825246810913,
+          "advantages_mean": 27.32942771911621,
+          "advantages_std": 7.2318291664123535,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.96535873413086,
+            "op_loss_scale": 0.6955690979957581
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.0829503536224365,
+            "rl_loss": 16.309253692626953,
+            "rl_loss_normalized": 1.087677001953125,
+            "opponent_policy_loss": 0.6922087073326111,
+            "opponent_policy_loss_normalized": 0.9952733516693115,
+            "advantages_mean": 23.3262882232666,
+            "advantages_std": 7.6430463790893555,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.994573593139648,
+              "op_loss_scale": 0.6954960823059082
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.606907844543457,
+            "rl_loss": 9.06867504119873,
+            "rl_loss_normalized": 0.6099257469177246,
+            "opponent_policy_loss": 0.6933515667915344,
+            "opponent_policy_loss_normalized": 0.9969820380210876,
+            "advantages_mean": 13.125450134277344,
+            "advantages_std": 6.526000022888184,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.868490219116211,
+              "op_loss_scale": 0.6954504251480103
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.2474024295806885,
+            "rl_loss": 18.671628952026367,
+            "rl_loss_normalized": 1.2491286993026733,
+            "opponent_policy_loss": 0.69422447681427,
+            "opponent_policy_loss_normalized": 0.9982737898826599,
+            "advantages_mean": 26.618244171142578,
+            "advantages_std": 7.759069919586182,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.947722434997559,
+              "op_loss_scale": 0.6954249143600464
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 58.0,
+              "average_reward": 2.9000000953674316,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 31.0,
+              "average_reward": 1.5499999523162842,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 20.0,
+              "average_reward": 1.0,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 60.0,
+              "average_reward": 3.0,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.4928998947143555,
+        "mixed_batch_loss": {
+          "total_loss": 2.4928998947143555,
+          "rl_loss": 22.586084365844727,
+          "rl_loss_normalized": 1.4954099655151367,
+          "opponent_policy_loss": 0.6936430335044861,
+          "opponent_policy_loss_normalized": 0.997489869594574,
+          "advantages_mean": 32.66072463989258,
+          "advantages_std": 8.56396198272705,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.103607177734375,
+            "op_loss_scale": 0.6953885555267334
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.3857507705688477,
+            "rl_loss": 21.147491455078125,
+            "rl_loss_normalized": 1.3890447616577148,
+            "opponent_policy_loss": 0.6930513381958008,
+            "opponent_policy_loss_normalized": 0.996705949306488,
+            "advantages_mean": 30.788131713867188,
+            "advantages_std": 10.798844337463379,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.224485397338867,
+              "op_loss_scale": 0.6953418254852295
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.6351196765899658,
+            "rl_loss": 9.629846572875977,
+            "rl_loss_normalized": 0.6371142864227295,
+            "opponent_policy_loss": 0.6939271688461304,
+            "opponent_policy_loss_normalized": 0.9980053305625916,
+            "advantages_mean": 13.908373832702637,
+            "advantages_std": 4.2710041999816895,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.114787101745605,
+              "op_loss_scale": 0.6953141093254089
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.451395034790039,
+            "rl_loss": 22.163602828979492,
+            "rl_loss_normalized": 1.453318476676941,
+            "opponent_policy_loss": 0.6939505338668823,
+            "opponent_policy_loss_normalized": 0.9980764389038086,
+            "advantages_mean": 31.82271385192871,
+            "advantages_std": 9.610777854919434,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.250341415405273,
+              "op_loss_scale": 0.6952879428863525
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 40.0,
+              "average_reward": 2.0,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.5,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 66.0,
+              "average_reward": 3.299999952316284,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 19.0,
+              "average_reward": 0.949999988079071,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 30.0,
+              "average_reward": 1.5,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 33.0,
+              "average_reward": 1.649999976158142,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 73.0,
+              "average_reward": 3.6500000953674316,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.9,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.1580381393432617,
+        "mixed_batch_loss": {
+          "total_loss": 2.1580381393432617,
+          "rl_loss": 17.716564178466797,
+          "rl_loss_normalized": 1.1581820249557495,
+          "opponent_policy_loss": 0.6951859593391418,
+          "opponent_policy_loss_normalized": 0.9998560547828674,
+          "advantages_mean": 25.84477424621582,
+          "advantages_std": 12.674760818481445,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.296874046325684,
+            "op_loss_scale": 0.6952860355377197
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.8612792491912842,
+            "rl_loss": 13.104759216308594,
+            "rl_loss_normalized": 0.858974814414978,
+            "opponent_policy_loss": 0.6969185471534729,
+            "opponent_policy_loss_normalized": 1.0023044347763062,
+            "advantages_mean": 19.167743682861328,
+            "advantages_std": 10.233946800231934,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.256278991699219,
+              "op_loss_scale": 0.6953162550926208
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.5102565288543701,
+            "rl_loss": 7.724654197692871,
+            "rl_loss_normalized": 0.5109121203422546,
+            "opponent_policy_loss": 0.6948519945144653,
+            "opponent_policy_loss_normalized": 0.9993444085121155,
+            "advantages_mean": 11.102409362792969,
+            "advantages_std": 6.910338401794434,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.119340896606445,
+              "op_loss_scale": 0.6953078508377075
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 1.9961035251617432,
+            "rl_loss": 15.092422485351562,
+            "rl_loss_normalized": 0.9982513189315796,
+            "opponent_policy_loss": 0.6937874555587769,
+            "opponent_policy_loss_normalized": 0.9978522658348083,
+            "advantages_mean": 22.292232513427734,
+            "advantages_std": 13.407546043395996,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.118860244750977,
+              "op_loss_scale": 0.6952807307243347
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 45.0,
+              "average_reward": 2.25,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 33.0,
+              "average_reward": 1.649999976158142,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.45,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 32.0,
+              "average_reward": 1.600000023841858,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 14.0,
+              "average_reward": 0.699999988079071,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.05,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 70.0,
+              "average_reward": 3.5,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 27.0,
+              "average_reward": 1.350000023841858,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.3045175075531006,
+        "mixed_batch_loss": {
+          "total_loss": 2.3045175075531006,
+          "rl_loss": 19.887697219848633,
+          "rl_loss_normalized": 1.3081839084625244,
+          "opponent_policy_loss": 0.692686140537262,
+          "opponent_policy_loss_normalized": 0.9963335394859314,
+          "advantages_mean": 28.70646095275879,
+          "advantages_std": 12.684653282165527,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.202524185180664,
+            "op_loss_scale": 0.6952351927757263
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.8660335540771484,
+            "rl_loss": 13.172746658325195,
+            "rl_loss_normalized": 0.8684834837913513,
+            "opponent_policy_loss": 0.6935020685195923,
+            "opponent_policy_loss_normalized": 0.9975500106811523,
+            "advantages_mean": 18.919300079345703,
+            "advantages_std": 15.663703918457031,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.167527198791504,
+              "op_loss_scale": 0.6952053308486938
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.646613597869873,
+            "rl_loss": 9.786845207214355,
+            "rl_loss_normalized": 0.6491530537605286,
+            "opponent_policy_loss": 0.6934095025062561,
+            "opponent_policy_loss_normalized": 0.9974605441093445,
+            "advantages_mean": 14.056721687316895,
+            "advantages_std": 6.023035526275635,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.076329231262207,
+              "op_loss_scale": 0.6951748728752136
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.2601723670959473,
+            "rl_loss": 19.17106819152832,
+            "rl_loss_normalized": 1.265870451927185,
+            "opponent_policy_loss": 0.6911469101905823,
+            "opponent_policy_loss_normalized": 0.9943019151687622,
+            "advantages_mean": 28.029062271118164,
+            "advantages_std": 16.05921745300293,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.144574165344238,
+              "op_loss_scale": 0.6951076984405518
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 65.0,
+              "average_reward": 3.25,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 19.0,
+              "average_reward": 0.949999988079071,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 28.0,
+              "average_reward": 1.399999976158142,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 78.0,
+              "average_reward": 3.9000000953674316,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.95,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 36.0,
+              "average_reward": 1.7999999523162842,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.2382071018218994,
+        "mixed_batch_loss": {
+          "total_loss": 2.2382071018218994,
+          "rl_loss": 18.863985061645508,
+          "rl_loss_normalized": 1.2405987977981567,
+          "opponent_policy_loss": 0.6934176087379456,
+          "opponent_policy_loss_normalized": 0.9976083636283875,
+          "advantages_mean": 27.091951370239258,
+          "advantages_std": 8.066935539245605,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.205548286437988,
+            "op_loss_scale": 0.6950799822807312
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.0622782707214355,
+            "rl_loss": 16.223054885864258,
+            "rl_loss_normalized": 1.0657665729522705,
+            "opponent_policy_loss": 0.6926156878471375,
+            "opponent_policy_loss_normalized": 0.9965116381645203,
+            "advantages_mean": 23.181432723999023,
+            "advantages_std": 9.586593627929688,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.221959114074707,
+              "op_loss_scale": 0.695040225982666
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.6644235849380493,
+            "rl_loss": 10.056564331054688,
+            "rl_loss_normalized": 0.6642394065856934,
+            "opponent_policy_loss": 0.6951702833175659,
+            "opponent_policy_loss_normalized": 1.000184178352356,
+            "advantages_mean": 14.617233276367188,
+            "advantages_std": 5.092817306518555,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.139968872070312,
+              "op_loss_scale": 0.6950422525405884
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.1855309009552,
+            "rl_loss": 18.058353424072266,
+            "rl_loss_normalized": 1.1891785860061646,
+            "opponent_policy_loss": 0.6924668550491333,
+            "opponent_policy_loss_normalized": 0.9963523149490356,
+            "advantages_mean": 25.817981719970703,
+            "advantages_std": 9.466278076171875,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.185568809509277,
+              "op_loss_scale": 0.695002019405365
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 35.0,
+              "average_reward": 1.75,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.55,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 49.0,
+              "average_reward": 2.450000047683716,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 20.0,
+              "average_reward": 1.0,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.45,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 32.0,
+              "average_reward": 1.600000023841858,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 20.0,
+              "average_reward": 1.0,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.15,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 63.0,
+              "average_reward": 3.1500000953674316,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.231802225112915,
+        "mixed_batch_loss": {
+          "total_loss": 2.231802225112915,
+          "rl_loss": 18.775714874267578,
+          "rl_loss_normalized": 1.2319375276565552,
+          "opponent_policy_loss": 0.69490647315979,
+          "opponent_policy_loss_normalized": 0.9998646378517151,
+          "advantages_mean": 27.337909698486328,
+          "advantages_std": 10.860126495361328,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.240801811218262,
+            "op_loss_scale": 0.6950005292892456
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.8631854057312012,
+            "rl_loss": 13.131731033325195,
+            "rl_loss_normalized": 0.8634271621704102,
+            "opponent_policy_loss": 0.6948299407958984,
+            "opponent_policy_loss_normalized": 0.999758243560791,
+            "advantages_mean": 18.986248016357422,
+            "advantages_std": 15.574507713317871,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.208846092224121,
+              "op_loss_scale": 0.6949979662895203
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.496570110321045,
+            "rl_loss": 7.492070198059082,
+            "rl_loss_normalized": 0.49637165665626526,
+            "opponent_policy_loss": 0.6951380372047424,
+            "opponent_policy_loss_normalized": 1.000198483467102,
+            "advantages_mean": 10.8588228225708,
+            "advantages_std": 5.0503082275390625,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.093670845031738,
+              "op_loss_scale": 0.6950000524520874
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.2857449054718018,
+            "rl_loss": 19.49517250061035,
+            "rl_loss_normalized": 1.2860970497131348,
+            "opponent_policy_loss": 0.6947516202926636,
+            "opponent_policy_loss_normalized": 0.9996477961540222,
+            "advantages_mean": 28.803171157836914,
+            "advantages_std": 14.193135261535645,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.158398628234863,
+              "op_loss_scale": 0.6949964165687561
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 71.0,
+              "average_reward": 3.549999952316284,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 23.0,
+              "average_reward": 1.149999976158142,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.55,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 19.0,
+              "average_reward": 0.949999988079071,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 66.0,
+              "average_reward": 3.299999952316284,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 46.0,
+              "average_reward": 2.299999952316284,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.45,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.0995044708251953,
+        "mixed_batch_loss": {
+          "total_loss": 2.0995044708251953,
+          "rl_loss": 16.702762603759766,
+          "rl_loss_normalized": 1.100257158279419,
+          "opponent_policy_loss": 0.6944656372070312,
+          "opponent_policy_loss_normalized": 0.9992473125457764,
+          "advantages_mean": 24.321744918823242,
+          "advantages_std": 12.20821475982666,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.180781364440918,
+            "op_loss_scale": 0.6949887275695801
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.6317172050476074,
+            "rl_loss": 9.544424057006836,
+            "rl_loss_normalized": 0.6320701241493225,
+            "opponent_policy_loss": 0.6947399973869324,
+            "opponent_policy_loss_normalized": 0.9996471405029297,
+            "advantages_mean": 14.157809257507324,
+            "advantages_std": 18.543352127075195,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.100261688232422,
+              "op_loss_scale": 0.6949852108955383
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.8391828536987305,
+            "rl_loss": 12.684945106506348,
+            "rl_loss_normalized": 0.8419448137283325,
+            "opponent_policy_loss": 0.6930383443832397,
+            "opponent_policy_loss_normalized": 0.997238039970398,
+            "advantages_mean": 18.191802978515625,
+            "advantages_std": 8.586078643798828,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.066243171691895,
+              "op_loss_scale": 0.6949577927589417
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 1.9633080959320068,
+            "rl_loss": 14.491628646850586,
+            "rl_loss_normalized": 0.9623705744743347,
+            "opponent_policy_loss": 0.6956185698509216,
+            "opponent_policy_loss_normalized": 1.000937581062317,
+            "advantages_mean": 20.824092864990234,
+            "advantages_std": 8.090176582336426,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.058262825012207,
+              "op_loss_scale": 0.6949669718742371
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 82.0,
+              "average_reward": 4.099999904632568,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": -1.0,
+              "average_reward": -0.05000000074505806,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 36.0,
+              "average_reward": 1.7999999523162842,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 32.0,
+              "average_reward": 1.600000023841858,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 45.0,
+              "average_reward": 2.25,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.55,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 35.0,
+              "average_reward": 1.75,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.129624843597412,
+        "mixed_batch_loss": {
+          "total_loss": 2.129624843597412,
+          "rl_loss": 17.0755615234375,
+          "rl_loss_normalized": 1.1318891048431396,
+          "opponent_policy_loss": 0.6933715343475342,
+          "opponent_policy_loss_normalized": 0.9977356791496277,
+          "advantages_mean": 24.46466827392578,
+          "advantages_std": 10.011820793151855,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.085896492004395,
+            "op_loss_scale": 0.6949450969696045
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.8042653799057007,
+            "rl_loss": 12.101801872253418,
+            "rl_loss_normalized": 0.8043431043624878,
+            "opponent_policy_loss": 0.6948903799057007,
+            "opponent_policy_loss_normalized": 0.9999222755432129,
+            "advantages_mean": 17.50520896911621,
+            "advantages_std": 12.11855697631836,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 15.045571327209473,
+              "op_loss_scale": 0.6949443817138672
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.511284589767456,
+            "rl_loss": 7.713852882385254,
+            "rl_loss_normalized": 0.5160521864891052,
+            "opponent_policy_loss": 0.6915866136550903,
+            "opponent_policy_loss_normalized": 0.9952324032783508,
+            "advantages_mean": 11.05455207824707,
+            "advantages_std": 4.23892879486084,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.94781494140625,
+              "op_loss_scale": 0.6948996186256409
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.1399874687194824,
+            "rl_loss": 17.099435806274414,
+            "rl_loss_normalized": 1.1417796611785889,
+            "opponent_policy_loss": 0.6936376690864563,
+            "opponent_policy_loss_normalized": 0.9982078075408936,
+            "advantages_mean": 24.420141220092773,
+            "advantages_std": 14.370078086853027,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.976125717163086,
+              "op_loss_scale": 0.6948830485343933
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 65.0,
+              "average_reward": 3.25,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 15.0,
+              "average_reward": 0.75,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 20.0,
+              "average_reward": 1.0,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 59.0,
+              "average_reward": 2.950000047683716,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 37.0,
+              "average_reward": 1.850000023841858,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.45,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.1831412315368652,
+        "mixed_batch_loss": {
+          "total_loss": 2.1831412315368652,
+          "rl_loss": 17.824613571166992,
+          "rl_loss_normalized": 1.1872692108154297,
+          "opponent_policy_loss": 0.6919770836830139,
+          "opponent_policy_loss_normalized": 0.9958721399307251,
+          "advantages_mean": 25.440248489379883,
+          "advantages_std": 15.636324882507324,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 15.013118743896484,
+            "op_loss_scale": 0.6948453187942505
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.7082359790802002,
+            "rl_loss": 10.638628959655762,
+            "rl_loss_normalized": 0.7112792730331421,
+            "opponent_policy_loss": 0.6927034258842468,
+            "opponent_policy_loss_normalized": 0.9969567656517029,
+            "advantages_mean": 14.672462463378906,
+            "advantages_std": 13.253522872924805,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.957035064697266,
+              "op_loss_scale": 0.6948179006576538
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.8343009948730469,
+            "rl_loss": 12.519098281860352,
+            "rl_loss_normalized": 0.83873450756073,
+            "opponent_policy_loss": 0.6916981935501099,
+            "opponent_policy_loss_normalized": 0.9955665469169617,
+            "advantages_mean": 17.86034393310547,
+            "advantages_std": 9.371347427368164,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.926175117492676,
+              "op_loss_scale": 0.6947784423828125
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 1.855208158493042,
+            "rl_loss": 12.811180114746094,
+            "rl_loss_normalized": 0.859825849533081,
+            "opponent_policy_loss": 0.6915298104286194,
+            "opponent_policy_loss_normalized": 0.9953823685646057,
+            "advantages_mean": 19.08864402770996,
+            "advantages_std": 14.85857105255127,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.899738311767578,
+              "op_loss_scale": 0.6947378516197205
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 64.0,
+              "average_reward": 3.200000047683716,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 6.0,
+              "average_reward": 0.30000001192092896,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 45.0,
+              "average_reward": 2.25,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 70.0,
+              "average_reward": 3.5,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 16.0,
+              "average_reward": 0.800000011920929,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.05,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.2271957397460938,
+        "mixed_batch_loss": {
+          "total_loss": 2.2271957397460938,
+          "rl_loss": 18.381052017211914,
+          "rl_loss_normalized": 1.2301009893417358,
+          "opponent_policy_loss": 0.6926942467689514,
+          "opponent_policy_loss_normalized": 0.9970946311950684,
+          "advantages_mean": 26.36156463623047,
+          "advantages_std": 10.767820358276367,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.942717552185059,
+            "op_loss_scale": 0.6947126388549805
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.6427521705627441,
+            "rl_loss": 9.61488151550293,
+            "rl_loss_normalized": 0.6462593674659729,
+            "opponent_policy_loss": 0.6922462582588196,
+            "opponent_policy_loss_normalized": 0.996492862701416,
+            "advantages_mean": 13.754916191101074,
+            "advantages_std": 14.181964874267578,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.8777437210083,
+              "op_loss_scale": 0.6946825981140137
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.7223281860351562,
+            "rl_loss": 10.693326950073242,
+            "rl_loss_normalized": 0.7211903929710388,
+            "opponent_policy_loss": 0.6954826712608337,
+            "opponent_policy_loss_normalized": 1.0011378526687622,
+            "advantages_mean": 15.175943374633789,
+            "advantages_std": 6.575102806091309,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.8273286819458,
+              "op_loss_scale": 0.6946921944618225
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.200660228729248,
+            "rl_loss": 17.938793182373047,
+            "rl_loss_normalized": 1.206831693649292,
+            "opponent_policy_loss": 0.6903536915779114,
+            "opponent_policy_loss_normalized": 0.9938286542892456,
+            "advantages_mean": 25.77798843383789,
+            "advantages_std": 13.536569595336914,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.864370346069336,
+              "op_loss_scale": 0.694640576839447
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 59.0,
+              "average_reward": 2.950000047683716,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 14.0,
+              "average_reward": 0.699999988079071,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 29.0,
+              "average_reward": 1.4500000476837158,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 27.0,
+              "average_reward": 1.350000023841858,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.45,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 63.0,
+              "average_reward": 3.1500000953674316,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 41.0,
+              "average_reward": 2.049999952316284,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.45,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.3213913440704346,
+        "mixed_batch_loss": {
+          "total_loss": 2.3213913440704346,
+          "rl_loss": 19.7428035736084,
+          "rl_loss_normalized": 1.3230878114700317,
+          "opponent_policy_loss": 0.6934481859207153,
+          "opponent_policy_loss_normalized": 0.9983035922050476,
+          "advantages_mean": 28.34636878967285,
+          "advantages_std": 10.485610961914062,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.92176342010498,
+            "op_loss_scale": 0.6946265697479248
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.9269306659698486,
+            "rl_loss": 13.8675537109375,
+            "rl_loss_normalized": 0.9301149249076843,
+            "opponent_policy_loss": 0.6923887729644775,
+            "opponent_policy_loss_normalized": 0.9968158006668091,
+            "advantages_mean": 19.583526611328125,
+            "advantages_std": 8.54693603515625,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.909505844116211,
+              "op_loss_scale": 0.694600522518158
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.8042502403259277,
+            "rl_loss": 11.9653902053833,
+            "rl_loss_normalized": 0.804360032081604,
+            "opponent_policy_loss": 0.6945233345031738,
+            "opponent_policy_loss_normalized": 0.999890148639679,
+            "advantages_mean": 17.32588768005371,
+            "advantages_std": 4.862786769866943,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.875664710998535,
+              "op_loss_scale": 0.6945996284484863
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.2771806716918945,
+            "rl_loss": 19.084789276123047,
+            "rl_loss_normalized": 1.2788417339324951,
+            "opponent_policy_loss": 0.693432629108429,
+            "opponent_policy_loss_normalized": 0.9983389377593994,
+            "advantages_mean": 27.714391708374023,
+            "advantages_std": 9.214302062988281,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.923495292663574,
+              "op_loss_scale": 0.6945863962173462
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 2.0,
+              "average_reward": 0.10000000149011612,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 57.0,
+              "average_reward": 2.8499999046325684,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 35.0,
+              "average_reward": 1.75,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 28.0,
+              "average_reward": 1.399999976158142,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 64.0,
+              "average_reward": 3.200000047683716,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.1098837852478027,
+        "mixed_batch_loss": {
+          "total_loss": 2.1098837852478027,
+          "rl_loss": 16.603321075439453,
+          "rl_loss_normalized": 1.1111571788787842,
+          "opponent_policy_loss": 0.6936918497085571,
+          "opponent_policy_loss_normalized": 0.9987266063690186,
+          "advantages_mean": 23.773401260375977,
+          "advantages_std": 9.966838836669922,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.94236946105957,
+            "op_loss_scale": 0.6945763230323792
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.7035436630249023,
+            "rl_loss": 10.45985221862793,
+            "rl_loss_normalized": 0.7023540735244751,
+            "opponent_policy_loss": 0.6954119205474854,
+            "opponent_policy_loss_normalized": 1.0011895895004272,
+            "advantages_mean": 15.106653213500977,
+            "advantages_std": 13.088530540466309,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.892562866210938,
+              "op_loss_scale": 0.6945856213569641
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.4962618350982666,
+            "rl_loss": 7.354187965393066,
+            "rl_loss_normalized": 0.4965783357620239,
+            "opponent_policy_loss": 0.6943632960319519,
+            "opponent_policy_loss_normalized": 0.9996834397315979,
+            "advantages_mean": 10.617904663085938,
+            "advantages_std": 5.865632057189941,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.809723854064941,
+              "op_loss_scale": 0.6945831775665283
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.188652992248535,
+            "rl_loss": 17.71048927307129,
+            "rl_loss_normalized": 1.1933283805847168,
+            "opponent_policy_loss": 0.6913002729415894,
+            "opponent_policy_loss_normalized": 0.9953247308731079,
+            "advantages_mean": 24.946104049682617,
+            "advantages_std": 11.922426223754883,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.841253280639648,
+              "op_loss_scale": 0.6945474743843079
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 65.0,
+              "average_reward": 3.25,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 12.0,
+              "average_reward": 0.6000000238418579,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 15.0,
+              "average_reward": 0.75,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 58.0,
+              "average_reward": 2.9000000953674316,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 40.0,
+              "average_reward": 2.0,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 1.9911339282989502,
+        "mixed_batch_loss": {
+          "total_loss": 1.9911339282989502,
+          "rl_loss": 14.716882705688477,
+          "rl_loss_normalized": 0.991709291934967,
+          "opponent_policy_loss": 0.6941434741020203,
+          "opponent_policy_loss_normalized": 0.9994245767593384,
+          "advantages_mean": 21.30530548095703,
+          "advantages_std": 9.176911354064941,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.839916229248047,
+            "op_loss_scale": 0.6945431232452393
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.3958263397216797,
+            "rl_loss": 5.833631992340088,
+            "rl_loss_normalized": 0.39565858244895935,
+            "opponent_policy_loss": 0.6946609020233154,
+            "opponent_policy_loss_normalized": 1.000167727470398,
+            "advantages_mean": 8.414178848266602,
+            "advantages_std": 11.440847396850586,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.744105339050293,
+              "op_loss_scale": 0.6945443749427795
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.545936107635498,
+            "rl_loss": 8.028129577636719,
+            "rl_loss_normalized": 0.5471209287643433,
+            "opponent_policy_loss": 0.6937127709388733,
+            "opponent_policy_loss_normalized": 0.9988152384757996,
+            "advantages_mean": 11.606927871704102,
+            "advantages_std": 6.521666049957275,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.673410415649414,
+              "op_loss_scale": 0.6945356130599976
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.169066905975342,
+            "rl_loss": 17.194931030273438,
+            "rl_loss_normalized": 1.1697489023208618,
+            "opponent_policy_loss": 0.6940568685531616,
+            "opponent_policy_loss_normalized": 0.9993178844451904,
+            "advantages_mean": 24.879709243774414,
+            "advantages_std": 9.987196922302246,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.699676513671875,
+              "op_loss_scale": 0.6945306062698364
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 46.0,
+              "average_reward": 2.299999952316284,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": -2.0,
+              "average_reward": -0.10000000149011612,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 27.0,
+              "average_reward": 1.350000023841858,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.55,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 18.0,
+              "average_reward": 0.8999999761581421,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 50.0,
+              "average_reward": 2.5,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 44.0,
+              "average_reward": 2.200000047683716,
+              "cooperation_rate": 0.25,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.473484992980957,
+        "mixed_batch_loss": {
+          "total_loss": 2.473484992980957,
+          "rl_loss": 21.792043685913086,
+          "rl_loss_normalized": 1.4751471281051636,
+          "opponent_policy_loss": 0.6933640837669373,
+          "opponent_policy_loss_normalized": 0.9983377456665039,
+          "advantages_mean": 31.59084701538086,
+          "advantages_std": 10.211938858032227,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.772793769836426,
+            "op_loss_scale": 0.6945185661315918
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.264317512512207,
+            "rl_loss": 18.764177322387695,
+            "rl_loss_normalized": 1.2666925191879272,
+            "opponent_policy_loss": 0.6928520202636719,
+            "opponent_policy_loss_normalized": 0.997624933719635,
+            "advantages_mean": 26.977039337158203,
+            "advantages_std": 8.623644828796387,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.813522338867188,
+              "op_loss_scale": 0.694501519203186
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.5843751430511475,
+            "rl_loss": 8.617260932922363,
+            "rl_loss_normalized": 0.5841841101646423,
+            "opponent_policy_loss": 0.6946355700492859,
+            "opponent_policy_loss_normalized": 1.00019109249115,
+            "advantages_mean": 12.439207077026367,
+            "advantages_std": 6.487304210662842,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.750933647155762,
+              "op_loss_scale": 0.6945028901100159
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.4598946571350098,
+            "rl_loss": 21.67601203918457,
+            "rl_loss_normalized": 1.4626007080078125,
+            "opponent_policy_loss": 0.692604660987854,
+            "opponent_policy_loss_normalized": 0.997294008731842,
+            "advantages_mean": 31.873498916625977,
+            "advantages_std": 9.572683334350586,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.820183753967285,
+              "op_loss_scale": 0.6944839358329773
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 19.0,
+              "average_reward": 0.949999988079071,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 69.0,
+              "average_reward": 3.450000047683716,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 23.0,
+              "average_reward": 1.149999976158142,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 37.0,
+              "average_reward": 1.850000023841858,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 72.0,
+              "average_reward": 3.5999999046325684,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.118068218231201,
+        "mixed_batch_loss": {
+          "total_loss": 2.118068218231201,
+          "rl_loss": 16.60536003112793,
+          "rl_loss_normalized": 1.119107723236084,
+          "opponent_policy_loss": 0.6937547922134399,
+          "opponent_policy_loss_normalized": 0.998960554599762,
+          "advantages_mean": 23.95291519165039,
+          "advantages_std": 8.508986473083496,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.838035583496094,
+            "op_loss_scale": 0.6944766640663147
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.611720085144043,
+            "rl_loss": 9.090360641479492,
+            "rl_loss_normalized": 0.6150214672088623,
+            "opponent_policy_loss": 0.6921607851982117,
+            "opponent_policy_loss_normalized": 0.9966985583305359,
+            "advantages_mean": 12.860674858093262,
+            "advantages_std": 5.656707286834717,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.780558586120605,
+              "op_loss_scale": 0.6944534778594971
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.4692834615707397,
+            "rl_loss": 6.913989067077637,
+            "rl_loss_normalized": 0.4702788293361664,
+            "opponent_policy_loss": 0.6937552690505981,
+            "opponent_policy_loss_normalized": 0.999004602432251,
+            "advantages_mean": 9.972132682800293,
+            "advantages_std": 4.25209903717041,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.701892852783203,
+              "op_loss_scale": 0.6944465041160583
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.4990074634552,
+            "rl_loss": 22.130611419677734,
+            "rl_loss_normalized": 1.4977220296859741,
+            "opponent_policy_loss": 0.6953482031822205,
+            "opponent_policy_loss_normalized": 1.001285433769226,
+            "advantages_mean": 32.40719985961914,
+            "advantages_std": 10.82815170288086,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.776180267333984,
+              "op_loss_scale": 0.6944555044174194
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 5.0,
+              "average_reward": 0.25,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.15,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 29.0,
+              "average_reward": 1.4500000476837158,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.55,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 20.0,
+              "average_reward": 1.0,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 16.0,
+              "average_reward": 0.800000011920929,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 32.0,
+              "average_reward": 1.600000023841858,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 74.0,
+              "average_reward": 3.700000047683716,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.41005802154541,
+        "mixed_batch_loss": {
+          "total_loss": 2.41005802154541,
+          "rl_loss": 20.94020652770996,
+          "rl_loss_normalized": 1.411272406578064,
+          "opponent_policy_loss": 0.6936037540435791,
+          "opponent_policy_loss_normalized": 0.9987857341766357,
+          "advantages_mean": 30.468494415283203,
+          "advantages_std": 10.208147048950195,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.837821006774902,
+            "op_loss_scale": 0.6944469809532166
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.193419933319092,
+            "rl_loss": 17.760709762573242,
+            "rl_loss_normalized": 1.1946357488632202,
+            "opponent_policy_loss": 0.6935941576957703,
+            "opponent_policy_loss_normalized": 0.9987841844558716,
+            "advantages_mean": 25.84677505493164,
+            "advantages_std": 8.21178150177002,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.867050170898438,
+              "op_loss_scale": 0.6944384574890137
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.540807843208313,
+            "rl_loss": 7.971904754638672,
+            "rl_loss_normalized": 0.538711428642273,
+            "opponent_policy_loss": 0.6959090232849121,
+            "opponent_policy_loss_normalized": 1.00209641456604,
+            "advantages_mean": 11.495844841003418,
+            "advantages_std": 4.517213821411133,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.79809856414795,
+              "op_loss_scale": 0.6944531798362732
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.481396436691284,
+            "rl_loss": 22.096643447875977,
+            "rl_loss_normalized": 1.4858797788619995,
+            "opponent_policy_loss": 0.6913083791732788,
+            "opponent_policy_loss_normalized": 0.9955166578292847,
+            "advantages_mean": 32.35504913330078,
+            "advantages_std": 11.418807029724121,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.871084213256836,
+              "op_loss_scale": 0.6944217085838318
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 14.0,
+              "average_reward": 0.699999988079071,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 67.0,
+              "average_reward": 3.3499999046325684,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 25.0,
+              "average_reward": 1.25,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 21.0,
+              "average_reward": 1.0499999523162842,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.6,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 35.0,
+              "average_reward": 1.75,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 72.0,
+              "average_reward": 3.5999999046325684,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.31172251701355,
+        "mixed_batch_loss": {
+          "total_loss": 2.31172251701355,
+          "rl_loss": 19.58036994934082,
+          "rl_loss_normalized": 1.312517523765564,
+          "opponent_policy_loss": 0.6938640475273132,
+          "opponent_policy_loss_normalized": 0.9992049932479858,
+          "advantages_mean": 28.212160110473633,
+          "advantages_std": 9.611811637878418,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.918177604675293,
+            "op_loss_scale": 0.6944161057472229
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.062758684158325,
+            "rl_loss": 15.912753105163574,
+            "rl_loss_normalized": 1.065958023071289,
+            "opponent_policy_loss": 0.6921720504760742,
+            "opponent_policy_loss_normalized": 0.9968006610870361,
+            "advantages_mean": 22.95965003967285,
+            "advantages_std": 8.189908027648926,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.928123474121094,
+              "op_loss_scale": 0.6943936347961426
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.740333080291748,
+            "rl_loss": 11.023360252380371,
+            "rl_loss_normalized": 0.7403656840324402,
+            "opponent_policy_loss": 0.6943708062171936,
+            "opponent_policy_loss_normalized": 0.9999674558639526,
+            "advantages_mean": 15.909360885620117,
+            "advantages_std": 8.94029426574707,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.88907527923584,
+              "op_loss_scale": 0.6943933963775635
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.155250072479248,
+            "rl_loss": 17.213512420654297,
+            "rl_loss_normalized": 1.1543148756027222,
+            "opponent_policy_loss": 0.6950492858886719,
+            "opponent_policy_loss_normalized": 1.0009350776672363,
+            "advantages_mean": 24.76457405090332,
+            "advantages_std": 10.401896476745605,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.912320137023926,
+              "op_loss_scale": 0.6943999528884888
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 10.0,
+              "average_reward": 0.5,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 58.0,
+              "average_reward": 2.9000000953674316,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 34.0,
+              "average_reward": 1.7000000476837158,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.3,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 29.0,
+              "average_reward": 1.4500000476837158,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.25,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 57.0,
+              "average_reward": 2.8499999046325684,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.207425117492676,
+        "mixed_batch_loss": {
+          "total_loss": 2.207425117492676,
+          "rl_loss": 18.061817169189453,
+          "rl_loss_normalized": 1.2086483240127563,
+          "opponent_policy_loss": 0.693541944026947,
+          "opponent_policy_loss_normalized": 0.9987767338752747,
+          "advantages_mean": 26.062135696411133,
+          "advantages_std": 12.376914978027344,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.943815231323242,
+            "op_loss_scale": 0.6943913698196411
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 1.9028244018554688,
+            "rl_loss": 13.515048027038574,
+            "rl_loss_normalized": 0.9052562117576599,
+            "opponent_policy_loss": 0.6926857233047485,
+            "opponent_policy_loss_normalized": 0.9975681900978088,
+            "advantages_mean": 19.419597625732422,
+            "advantages_std": 13.783987045288086,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.92952823638916,
+              "op_loss_scale": 0.6943743228912354
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.5990138053894043,
+            "rl_loss": 8.924968719482422,
+            "rl_loss_normalized": 0.6002205014228821,
+            "opponent_policy_loss": 0.6935279965400696,
+            "opponent_policy_loss_normalized": 0.998793363571167,
+            "advantages_mean": 12.870765686035156,
+            "advantages_std": 6.005126476287842,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.86948299407959,
+              "op_loss_scale": 0.6943658590316772
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 1.9759180545806885,
+            "rl_loss": 14.506878852844238,
+            "rl_loss_normalized": 0.9758521914482117,
+            "opponent_policy_loss": 0.694412112236023,
+            "opponent_policy_loss_normalized": 1.0000659227371216,
+            "advantages_mean": 21.07280731201172,
+            "advantages_std": 13.377481460571289,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.865857124328613,
+              "op_loss_scale": 0.6943663358688354
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 64.0,
+              "average_reward": 3.200000047683716,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.75,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 27.0,
+              "average_reward": 1.350000023841858,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 27.0,
+              "average_reward": 1.350000023841858,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.7,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 22.0,
+              "average_reward": 1.100000023841858,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 66.0,
+              "average_reward": 3.299999952316284,
+              "cooperation_rate": 0.5,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            },
+            {
+              "cumulative_reward": 28.0,
+              "average_reward": 1.399999976158142,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.2,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.3736274242401123,
+        "mixed_batch_loss": {
+          "total_loss": 2.3736274242401123,
+          "rl_loss": 20.510759353637695,
+          "rl_loss_normalized": 1.3745033740997314,
+          "opponent_policy_loss": 0.6937519907951355,
+          "opponent_policy_loss_normalized": 0.9991240501403809,
+          "advantages_mean": 29.622426986694336,
+          "advantages_std": 12.895959854125977,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.922306060791016,
+            "op_loss_scale": 0.6943601965904236
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.2153871059417725,
+            "rl_loss": 18.193063735961914,
+            "rl_loss_normalized": 1.2165193557739258,
+            "opponent_policy_loss": 0.693566083908081,
+            "opponent_policy_loss_normalized": 0.9988677501678467,
+            "advantages_mean": 26.384471893310547,
+            "advantages_std": 12.69218635559082,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.955013275146484,
+              "op_loss_scale": 0.6943522691726685
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.6597098112106323,
+            "rl_loss": 9.860407829284668,
+            "rl_loss_normalized": 0.6615917682647705,
+            "opponent_policy_loss": 0.6930323839187622,
+            "opponent_policy_loss_normalized": 0.9981180429458618,
+            "advantages_mean": 14.24012279510498,
+            "advantages_std": 4.73457145690918,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.904067039489746,
+              "op_loss_scale": 0.6943390965461731
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.1581003665924072,
+            "rl_loss": 17.281158447265625,
+            "rl_loss_normalized": 1.1576464176177979,
+            "opponent_policy_loss": 0.6946574449539185,
+            "opponent_policy_loss_normalized": 1.0004539489746094,
+            "advantages_mean": 24.790836334228516,
+            "advantages_std": 9.32546329498291,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.927838325500488,
+              "op_loss_scale": 0.6943422555923462
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": -8.0,
+              "average_reward": -0.4000000059604645,
+              "cooperation_rate": 0.6,
+              "opponent_cooperation_rate": 0.05,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 78.0,
+              "average_reward": 3.9000000953674316,
+              "cooperation_rate": 0.25,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.8,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 37.0,
+              "average_reward": 1.850000023841858,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.4,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 54.0,
+              "average_reward": 2.700000047683716,
+              "cooperation_rate": 0.55,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      },
+      {
+        "total_loss": 2.297468423843384,
+        "mixed_batch_loss": {
+          "total_loss": 2.297468423843384,
+          "rl_loss": 19.436466217041016,
+          "rl_loss_normalized": 1.298107624053955,
+          "opponent_policy_loss": 0.6938939690589905,
+          "opponent_policy_loss_normalized": 0.9993607997894287,
+          "advantages_mean": 27.99885368347168,
+          "advantages_std": 10.588807106018066,
+          "alpha": 1.0,
+          "temperature": 0.1,
+          "normalization_stats": {
+            "rl_loss_scale": 14.97292423248291,
+            "op_loss_scale": 0.694337785243988
+          }
+        },
+        "per_game_losses": {
+          "hawk-dove": {
+            "total_loss": 2.0717830657958984,
+            "rl_loss": 16.08114242553711,
+            "rl_loss_normalized": 1.0732204914093018,
+            "opponent_policy_loss": 0.6933297514915466,
+            "opponent_policy_loss_normalized": 0.9985626935958862,
+            "advantages_mean": 23.17641830444336,
+            "advantages_std": 10.832404136657715,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.984006881713867,
+              "op_loss_scale": 0.694327712059021
+            }
+          },
+          "battle-of-sexes": {
+            "total_loss": 1.6510472297668457,
+            "rl_loss": 9.726137161254883,
+            "rl_loss_normalized": 0.6513869166374207,
+            "opponent_policy_loss": 0.6940895318984985,
+            "opponent_policy_loss_normalized": 0.9996603727340698,
+            "advantages_mean": 14.051923751831055,
+            "advantages_std": 4.202303886413574,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.931427955627441,
+              "op_loss_scale": 0.69432532787323
+            }
+          },
+          "prisoners-dilemma": {
+            "total_loss": 2.2790675163269043,
+            "rl_loss": 19.15365219116211,
+            "rl_loss_normalized": 1.2791571617126465,
+            "opponent_policy_loss": 0.6942625641822815,
+            "opponent_policy_loss_normalized": 0.9999104738235474,
+            "advantages_mean": 27.602737426757812,
+            "advantages_std": 10.50606632232666,
+            "alpha": 1.0,
+            "temperature": 0.1,
+            "normalization_stats": {
+              "rl_loss_scale": 14.973650932312012,
+              "op_loss_scale": 0.6943247318267822
+            }
+          }
+        },
+        "game_session_stats": {
+          "hawk-dove": [
+            {
+              "cumulative_reward": 0.0,
+              "average_reward": 0.0,
+              "cooperation_rate": 0.4,
+              "opponent_cooperation_rate": 0.15,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 62.0,
+              "average_reward": 3.0999999046325684,
+              "cooperation_rate": 0.65,
+              "opponent_cooperation_rate": 0.85,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "battle-of-sexes": [
+            {
+              "cumulative_reward": 25.0,
+              "average_reward": 1.25,
+              "cooperation_rate": 0.3,
+              "opponent_cooperation_rate": 0.45,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 26.0,
+              "average_reward": 1.2999999523162842,
+              "cooperation_rate": 0.45,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ],
+          "prisoners-dilemma": [
+            {
+              "cumulative_reward": 29.0,
+              "average_reward": 1.4500000476837158,
+              "cooperation_rate": 0.7,
+              "opponent_cooperation_rate": 0.35,
+              "num_games": 20,
+              "opponent_type": 0.7,
+              "opponent_name": "Probabilistic-p0.70"
+            },
+            {
+              "cumulative_reward": 61.0,
+              "average_reward": 3.049999952316284,
+              "cooperation_rate": 0.35,
+              "opponent_cooperation_rate": 0.65,
+              "num_games": 20,
+              "opponent_type": 0.3,
+              "opponent_name": "Probabilistic-p0.30"
+            }
+          ]
+        },
+        "num_sessions_per_game": {
+          "hawk-dove": 2,
+          "battle-of-sexes": 2,
+          "prisoners-dilemma": 2
+        },
+        "total_sessions": 6
+      }
+    ],
+    "final_metrics": {
+      "total_epochs": 31,
+      "best_loss": 1.9906413555145264,
+      "convergence_info": {
+        "converged": true,
+        "final_loss": 1.9906413555145264,
+        "epochs_trained": 31
+      },
+      "loss_statistics": {
+        "loss_balance_ratio": 26.947291092310305,
+        "tom_contribution": 0.31097238490787793,
+        "total_loss_history": [
+          2.0,
+          2.0874509811401367,
+          2.336545705795288,
+          2.279738664627075,
+          2.438105821609497,
+          1.9906413555145264,
+          2.337588310241699,
+          2.2981228828430176,
+          2.2098073959350586,
+          2.0318639278411865,
+          2.258016347885132,
+          2.2696943283081055,
+          2.4928998947143555,
+          2.1580381393432617,
+          2.3045175075531006,
+          2.2382071018218994,
+          2.231802225112915,
+          2.0995044708251953,
+          2.129624843597412,
+          2.1831412315368652,
+          2.2271957397460938,
+          2.3213913440704346,
+          2.1098837852478027,
+          1.9911339282989502,
+          2.473484992980957,
+          2.118068218231201,
+          2.41005802154541,
+          2.31172251701355,
+          2.207425117492676,
+          2.3736274242401123,
+          2.297468423843384
+        ],
+        "rl_loss_history": [
+          18.41650390625,
+          17.013105392456055,
+          19.780487060546875,
+          19.355730056762695,
+          22.127296447753906,
+          15.447360038757324,
+          20.247297286987305,
+          19.714143753051758,
+          18.488130569458008,
+          15.66745376586914,
+          18.9144287109375,
+          19.05107879638672,
+          22.586084365844727,
+          17.716564178466797,
+          19.887697219848633,
+          18.863985061645508,
+          18.775714874267578,
+          16.702762603759766,
+          17.0755615234375,
+          17.824613571166992,
+          18.381052017211914,
+          19.7428035736084,
+          16.603321075439453,
+          14.716882705688477,
+          21.792043685913086,
+          16.60536003112793,
+          20.94020652770996,
+          19.58036994934082,
+          18.061817169189453,
+          20.510759353637695,
+          19.436466217041016
+        ],
+        "opponent_policy_history": [
+          0.6958894729614258,
+          0.7062360644340515,
+          0.6995704770088196,
+          0.6948906183242798,
+          0.6932068467140198,
+          0.6936973929405212,
+          0.6945773959159851,
+          0.6944539546966553,
+          0.6929287314414978,
+          0.694145143032074,
+          0.6922407746315002,
+          0.6932615637779236,
+          0.6936430335044861,
+          0.6951859593391418,
+          0.692686140537262,
+          0.6934176087379456,
+          0.69490647315979,
+          0.6944656372070312,
+          0.6933715343475342,
+          0.6919770836830139,
+          0.6926942467689514,
+          0.6934481859207153,
+          0.6936918497085571,
+          0.6941434741020203,
+          0.6933640837669373,
+          0.6937547922134399,
+          0.6936037540435791,
+          0.6938640475273132,
+          0.693541944026947,
+          0.6937519907951355,
+          0.6938939690589905
+        ]
+      },
+      "games_info": {
+        "hawk-dove": {
+          "payoff_matrix": [
+            [
+              3.0,
+              0.0
+            ],
+            [
+              6.0,
+              -2.0
+            ]
+          ],
+          "state_size": 5
+        },
+        "battle-of-sexes": {
+          "payoff_matrix": [
+            [
+              3.0,
+              0.0
+            ],
+            [
+              0.0,
+              2.0
+            ]
+          ],
+          "state_size": 5
+        },
+        "prisoners-dilemma": {
+          "payoff_matrix": [
+            [
+              3.0,
+              0.0
+            ],
+            [
+              5.0,
+              1.0
+            ]
+          ],
+          "state_size": 5
+        }
+      },
+      "final_weights": {
+        "alpha": 1.0,
+        "gamma": 0.99,
+        "use_gae": true
+      }
+    }
+  },
+  "test_results": {
+    "Probabilistic-p0.70": {
+      "cooperation_rate": 0.512,
+      "opponent_cooperation_rate": 0.28800000000000003,
+      "num_games": 20.0,
+      "opponent_type": 0.7000000000000002
+    },
+    "Probabilistic-p0.30": {
+      "cooperation_rate": 0.4809999999999999,
+      "opponent_cooperation_rate": 0.6800000000000002,
+      "num_games": 20.0,
+      "opponent_type": 0.30000000000000004
+    }
+  },
+  "network_parameters": 226309,
+  "device": "cpu"
+}

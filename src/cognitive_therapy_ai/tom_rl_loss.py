@@ -43,7 +43,8 @@ class ToMRLLoss(nn.Module):
         use_gae: bool = True,
         gae_lambda: float = 0.95,
         normalize_losses: bool = True,
-        reward_scale: float = 1.0
+        reward_scale: float = 1.0,
+        temperature: float = 0.1
     ):
         """
         Initialize ToM-RL loss function.
@@ -55,6 +56,7 @@ class ToMRLLoss(nn.Module):
             gae_lambda: GAE lambda parameter for bias-variance tradeoff
             normalize_losses: Whether to normalize losses for comparable scales
             reward_scale: Expected scale of rewards (for normalization)
+            temperature: Temperature for opponent policy softmax (low = sharp predictions)
         """
         super(ToMRLLoss, self).__init__()
         
@@ -64,6 +66,7 @@ class ToMRLLoss(nn.Module):
         self.gae_lambda = gae_lambda
         self.normalize_losses = normalize_losses
         self.reward_scale = reward_scale
+        self.temperature = temperature
         
         # Running statistics for adaptive normalization
         self.register_buffer('rl_loss_ema', torch.tensor(1.0))
@@ -79,11 +82,12 @@ class ToMRLLoss(nn.Module):
     def forward(
         self,
         policy_logits: torch.Tensor,
-        opponent_coop_probs: torch.Tensor,
+        opponent_policy_logits: torch.Tensor,
         value_estimates: torch.Tensor,
         actions_taken: torch.Tensor,
         rewards: torch.Tensor,
         opponent_actions: torch.Tensor,
+        true_opponent_policy: torch.Tensor,
         dones: Optional[torch.Tensor] = None,
         next_value: Optional[torch.Tensor] = None
     ) -> Dict[str, torch.Tensor]:
@@ -92,11 +96,12 @@ class ToMRLLoss(nn.Module):
         
         Args:
             policy_logits: Action logits from policy head (batch_size, num_actions)
-            opponent_coop_probs: Predicted cooperation probabilities (batch_size, 1)
+            opponent_policy_logits: Predicted opponent policy logits (batch_size, 2)
             value_estimates: Value function estimates (batch_size, 1)
             actions_taken: Actions actually taken by the agent (batch_size,)
             rewards: Rewards received (batch_size,)
             opponent_actions: True opponent actions (batch_size,) - 1 for cooperate, 0 for defect
+            true_opponent_policy: True opponent policy from opponent type (batch_size, 2)
             dones: Episode termination flags (batch_size,), optional
             next_value: Value estimate for next state (for advantage calculation)
             
@@ -110,9 +115,9 @@ class ToMRLLoss(nn.Module):
             policy_logits, actions_taken, rewards, value_estimates, dones, next_value
         )
         
-        # 2. Calculate Opponent Prediction Loss (LOp)
-        opponent_pred_loss = self._calculate_opponent_prediction_loss(
-            opponent_coop_probs, opponent_actions
+        # 2. Calculate Opponent Policy Loss (LOp)
+        opponent_pred_loss = self._calculate_opponent_policy_loss(
+            opponent_policy_logits, true_opponent_policy
         )
         
         # 3. Apply normalization if enabled
@@ -131,10 +136,11 @@ class ToMRLLoss(nn.Module):
             'total_loss': total_loss,
             'rl_loss': rl_loss,
             'rl_loss_normalized': rl_loss_norm,
-            'opponent_prediction_loss': opponent_pred_loss,
-            'opponent_prediction_loss_normalized': opponent_pred_loss_norm,
+            'opponent_policy_loss': opponent_pred_loss,
+            'opponent_policy_loss_normalized': opponent_pred_loss_norm,
             'advantages': advantages,  # For logging/analysis
             'alpha': self.alpha,
+            'temperature': self.temperature,
             'normalization_stats': {
                 'rl_loss_scale': self.rl_loss_ema.item(),
                 'op_loss_scale': self.op_loss_ema.item()
@@ -173,31 +179,55 @@ class ToMRLLoss(nn.Module):
         
         return rl_loss, advantages
     
-    def _calculate_opponent_prediction_loss(
+    def _calculate_opponent_policy_loss(
         self,
-        opponent_coop_probs: torch.Tensor,
-        opponent_actions: torch.Tensor
+        predicted_opponent_logits: torch.Tensor,
+        true_opponent_policy: torch.Tensor
     ) -> torch.Tensor:
         """
-        Calculate opponent prediction loss using binary cross-entropy.
+        Calculate opponent policy loss using KL divergence.
         
-        LOp = -Σ_t [o_t * log(p̂_t^d) + (1 - o_t) * log(1 - p̂_t^d)]
+        L_Op = KL(π_true || π_pred) = Σ π_true(a) * log(π_true(a) / π_pred(a))
         
         Where:
-        - o_t ∈ {0, 1} indicates opponent cooperation (1) or defection (0)
-        - p̂_t^d ∈ [0, 1] is predicted probability of opponent cooperation
+        - π_true(a) is the true opponent policy from opponent type parameters
+        - π_pred(a) = softmax(opponent_logits / temperature) is the predicted policy
+        
+        Args:
+            predicted_opponent_logits: Network predicted opponent policy logits (batch_size, 2)
+            true_opponent_policy: True opponent policy distribution (batch_size, 2)
+                                 Format: [p_defect, p_cooperate] where p_defect = 1-p_d, p_cooperate = p_d
+        
+        Returns:
+            KL divergence loss (scalar)
         """
-        # Ensure opponent_actions are float for BCE loss
-        opponent_actions_float = opponent_actions.float().unsqueeze(1)
+        # Convert predicted logits to policy distribution using temperature
+        predicted_policy = F.softmax(predicted_opponent_logits / self.temperature, dim=-1)
         
-        # Binary cross-entropy loss
-        bce_loss = F.binary_cross_entropy(
-            opponent_coop_probs, 
-            opponent_actions_float, 
-            reduction='mean'
-        )
+        # Ensure true policy is normalized (should already be, but safety check)
+        true_policy_normalized = true_opponent_policy / (true_opponent_policy.sum(dim=-1, keepdim=True) + 1e-8)
         
-        return bce_loss
+        # Add small epsilon to avoid log(0) and division by 0
+        eps = 1e-8
+        predicted_policy = predicted_policy + eps
+        true_policy_normalized = true_policy_normalized + eps
+        
+        # Calculate KL divergence: KL(true || pred) = Σ true * log(true / pred)
+        # Note: We use log_softmax for numerical stability
+        log_predicted_policy = F.log_softmax(predicted_opponent_logits / self.temperature, dim=-1)
+        
+        # KL(P || Q) = Σ P(x) * log(P(x)) - Σ P(x) * log(Q(x))
+        # First term: entropy of true policy (constant, doesn't affect gradients)
+        entropy_true = -torch.sum(true_policy_normalized * torch.log(true_policy_normalized), dim=-1)
+        
+        # Second term: negative cross-entropy between true and predicted
+        cross_entropy = -torch.sum(true_policy_normalized * log_predicted_policy, dim=-1)
+        
+        # KL divergence = cross_entropy - entropy_true
+        # But since entropy_true is constant, we can just use cross_entropy for gradient-based learning
+        kl_loss = cross_entropy.mean()
+        
+        return kl_loss
     
     def _normalize_losses(
         self,
@@ -427,10 +457,10 @@ class AdaptiveToMRLLoss(ToMRLLoss):
         # Use normalized losses if available for better balance assessment
         if self.normalize_losses and 'rl_loss_normalized' in loss_dict:
             rl_loss = loss_dict['rl_loss_normalized'].item()
-            opponent_loss = loss_dict['opponent_prediction_loss_normalized'].item()
+            opponent_loss = loss_dict['opponent_policy_loss_normalized'].item()
         else:
             rl_loss = loss_dict['rl_loss'].item()
-            opponent_loss = loss_dict['opponent_prediction_loss'].item()
+            opponent_loss = loss_dict['opponent_policy_loss'].item()
             
         # Record current losses
         self.rl_loss_history.append(rl_loss)
@@ -482,7 +512,7 @@ class LossAnalyzer:
         self.loss_history = {
             'total': [],
             'rl': [],
-            'opponent_prediction': [],
+            'opponent_policy': [],
             'alpha_values': [],
             'epoch': []
         }
@@ -491,7 +521,7 @@ class LossAnalyzer:
         """Record loss values for analysis."""
         self.loss_history['total'].append(loss_dict['total_loss'].item())
         self.loss_history['rl'].append(loss_dict['rl_loss'].item())
-        self.loss_history['opponent_prediction'].append(loss_dict['opponent_prediction_loss'].item())
+        self.loss_history['opponent_policy'].append(loss_dict['opponent_policy_loss'].item())
         self.loss_history['alpha_values'].append(loss_dict['alpha'])
         self.loss_history['epoch'].append(epoch)
         
@@ -499,11 +529,11 @@ class LossAnalyzer:
         if 'rl_loss_normalized' in loss_dict:
             if 'rl_normalized' not in self.loss_history:
                 self.loss_history['rl_normalized'] = []
-                self.loss_history['opponent_prediction_normalized'] = []
+                self.loss_history['opponent_policy_normalized'] = []
                 
             self.loss_history['rl_normalized'].append(loss_dict['rl_loss_normalized'].item())
-            self.loss_history['opponent_prediction_normalized'].append(
-                loss_dict['opponent_prediction_loss_normalized'].item()
+            self.loss_history['opponent_policy_normalized'].append(
+                loss_dict['opponent_policy_loss_normalized'].item()
             )
     
     def get_loss_balance_ratio(self, window_size: int = 50) -> float:
@@ -519,7 +549,7 @@ class LossAnalyzer:
             return 1.0
         
         recent_rl = np.mean(self.loss_history['rl'][-window_size:])
-        recent_opponent = np.mean(self.loss_history['opponent_prediction'][-window_size:])
+        recent_opponent = np.mean(self.loss_history['opponent_policy'][-window_size:])
         
         if recent_opponent > 0:
             return recent_rl / recent_opponent
@@ -539,7 +569,7 @@ class LossAnalyzer:
             return 0.0
         
         recent_total = np.mean(self.loss_history['total'][-window_size:])
-        recent_opponent = np.mean(self.loss_history['opponent_prediction'][-window_size:])
+        recent_opponent = np.mean(self.loss_history['opponent_policy'][-window_size:])
         recent_alpha = np.mean(self.loss_history['alpha_values'][-window_size:])
         
         if recent_total > 0:

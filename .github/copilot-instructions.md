@@ -171,3 +171,24 @@ This framework studies **cognitive therapy analogies** in AI:
 - **Multi-task Learning**: Balancing reward optimization with Theory of Mind development
 
 The ToM-RL approach creates inductive bias for understanding opponent behavior patterns, analogous to Theory of Mind in cognitive science.
+
+## Change Documentation
+
+### Tracking Modifications
+- **CHANGELOG.md**: High-level changes with dates and impact
+- **docs/MODIFICATIONS.md**: Detailed technical documentation of all changes
+- **Git commits**: Atomic changes with descriptive messages
+- **.github/copilot-instructions.md**: Updated with new patterns and conventions
+
+### Critical Files for Modifications
+- `tom_rl_loss.py`: Loss function modifications (primary focus)
+- `trainer.py`: Training procedure changes
+- `opponent.py`: New opponent strategies
+- `main_experiment.py`: Experiment configuration changes
+
+### Documentation Standards
+1. **Before/After Code**: Always show original and modified implementations
+2. **Mathematical Notation**: Document formula changes precisely
+3. **Parameter Impact**: Explain effect of parameter modifications
+4. **Research Rationale**: Connect changes to research hypotheses
+5. **Testing Plan**: Define validation approach for each change
