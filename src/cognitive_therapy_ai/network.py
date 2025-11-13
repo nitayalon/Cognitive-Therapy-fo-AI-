@@ -74,13 +74,17 @@ class GameLSTM(nn.Module):
             nn.Linear(hidden_size // 2, num_actions)
         )
         
-        # Opponent policy prediction head - outputs logits for opponent policy distribution
-        # This creates ToM inductive bias for understanding opponent behavior patterns
+        # Enhanced opponent policy prediction head - dedicated architecture for ToM
+        # This creates stronger inductive bias for understanding opponent behavior patterns
         self.opponent_policy_head = nn.Sequential(
             nn.Linear(hidden_size, hidden_size // 2),
+            nn.LayerNorm(hidden_size // 2),  # Stabilize learning
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_size // 2, 2),  # 2 actions: [defect, cooperate]
+            nn.Linear(hidden_size // 2, hidden_size // 4),
+            nn.ReLU(),
+            nn.Dropout(dropout * 0.5),  # Less dropout in final layers
+            nn.Linear(hidden_size // 4, 2),  # 2 actions: [defect, cooperate]
             # No activation - raw logits for policy distribution
         )
         
@@ -96,7 +100,7 @@ class GameLSTM(nn.Module):
         self._initialize_weights()
     
     def _initialize_weights(self):
-        """Initialize network weights."""
+        """Initialize network weights with specialized initialization for opponent policy head."""
         for name, param in self.named_parameters():
             if 'weight_ih' in name:
                 nn.init.xavier_uniform_(param.data)
@@ -104,6 +108,15 @@ class GameLSTM(nn.Module):
                 nn.init.orthogonal_(param.data)
             elif 'bias' in name:
                 param.data.fill_(0)
+            elif 'opponent_policy_head' in name and 'weight' in name and param.dim() >= 2:
+                # Specialized initialization for opponent policy prediction
+                # Use smaller initialization to prevent saturation
+                # Only apply to 2D+ tensors (weight matrices, not bias vectors)
+                nn.init.xavier_uniform_(param.data, gain=0.5)
+            elif 'opponent_policy_head' in name and 'bias' in name:
+                # Initialize final layer bias to encourage balanced predictions
+                if param.shape[0] == 2:  # Final layer bias
+                    param.data.fill_(0.0)  # Start with balanced predictions
     
     def forward(
         self, 
@@ -209,7 +222,39 @@ class GameLSTM(nn.Module):
             'hidden': new_hidden
         }
     
-    def init_hidden(self, batch_size: int, device: Optional[torch.device] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def analyze_predictions(self, x: torch.Tensor, hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None) -> Dict[str, Any]:
+        """
+        Analyze network predictions for debugging opponent policy learning.
+        
+        Args:
+            x: Input tensor
+            hidden: Optional hidden state
+            
+        Returns:
+            Dictionary with detailed prediction analysis
+        """
+        with torch.no_grad():
+            policy_logits, opponent_policy_logits, value_estimate, new_hidden = self.forward(x, hidden)
+            
+            # Agent policy analysis
+            agent_probs = F.softmax(policy_logits, dim=-1)
+            
+            # Opponent policy analysis with different temperatures
+            opp_probs_raw = F.softmax(opponent_policy_logits, dim=-1)
+            opp_probs_temp01 = F.softmax(opponent_policy_logits / 0.1, dim=-1)
+            opp_probs_temp10 = F.softmax(opponent_policy_logits / 1.0, dim=-1)
+            
+            return {
+                'agent_policy_probs': agent_probs,
+                'opponent_policy_logits': opponent_policy_logits,
+                'opponent_policy_probs_raw': opp_probs_raw,
+                'opponent_policy_probs_temp_0.1': opp_probs_temp01,
+                'opponent_policy_probs_temp_1.0': opp_probs_temp10,
+                'value_estimate': value_estimate,
+                'hidden_state_norm': torch.norm(new_hidden[0], dim=-1) if new_hidden else None
+            }
+    
+    def init_hidden(self, batch_size: int, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Initialize hidden state for LSTM.
         

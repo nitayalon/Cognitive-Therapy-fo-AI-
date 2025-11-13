@@ -13,6 +13,7 @@ from .opponent import Opponent, OpponentFactory
 from .network import GameLSTM
 from .trainer import GameTrainer
 from .tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss
+from .training_monitor import TrainingMonitor, BatchedTrainingMonitor
 
 __all__ = [
     "HawkDove",
@@ -26,5 +27,7 @@ __all__ = [
     "GameLSTM",
     "GameTrainer",
     "ToMRLLoss",
-    "AdaptiveToMRLLoss"
+    "AdaptiveToMRLLoss",
+    "TrainingMonitor",
+    "BatchedTrainingMonitor"
 ]

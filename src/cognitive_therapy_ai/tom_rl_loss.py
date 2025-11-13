@@ -132,12 +132,24 @@ class ToMRLLoss(nn.Module):
         # 4. Combine normalized losses
         total_loss = rl_loss_norm + self.alpha * opponent_pred_loss_norm
         
+        # Enhanced loss component analysis for debugging
+        loss_ratio = (opponent_pred_loss_norm / (rl_loss_norm + 1e-8)).item()
+        alpha_contribution = (self.alpha * opponent_pred_loss_norm / total_loss).item()
+        
+        # Log loss component analysis every few iterations
+        if hasattr(self, 'logger') and self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(f"Loss Components - RL: {rl_loss.item():.6f}, OpPolicy: {opponent_pred_loss.item():.6f}")
+            self.logger.debug(f"Loss Normalized - RL: {rl_loss_norm.item():.6f}, OpPolicy: {opponent_pred_loss_norm.item():.6f}")
+            self.logger.debug(f"Loss Ratio (OpPolicy/RL): {loss_ratio:.4f}, Alpha Contribution: {alpha_contribution:.4f}")
+        
         return {
             'total_loss': total_loss,
             'rl_loss': rl_loss,
             'rl_loss_normalized': rl_loss_norm,
             'opponent_policy_loss': opponent_pred_loss,
             'opponent_policy_loss_normalized': opponent_pred_loss_norm,
+            'loss_ratio': loss_ratio,
+            'alpha_contribution': alpha_contribution,
             'advantages': advantages,  # For logging/analysis
             'alpha': self.alpha,
             'temperature': self.temperature,
@@ -226,6 +238,19 @@ class ToMRLLoss(nn.Module):
         # KL divergence = cross_entropy - entropy_true
         # But since entropy_true is constant, we can just use cross_entropy for gradient-based learning
         kl_loss = cross_entropy.mean()
+        
+        # Detailed logging for debugging opponent policy learning
+        if hasattr(self, 'logger') and self.logger.isEnabledFor(logging.DEBUG):
+            with torch.no_grad():
+                pred_probs = F.softmax(predicted_opponent_logits / self.temperature, dim=-1)
+                avg_pred_defect = pred_probs[:, 0].mean().item()
+                avg_pred_cooperate = pred_probs[:, 1].mean().item()
+                avg_true_defect = true_policy_normalized[:, 0].mean().item()
+                avg_true_cooperate = true_policy_normalized[:, 1].mean().item()
+                
+                self.logger.debug(f"Opponent Policy Loss: {kl_loss.item():.6f}")
+                self.logger.debug(f"Predicted: [defect={avg_pred_defect:.4f}, cooperate={avg_pred_cooperate:.4f}]")
+                self.logger.debug(f"True: [defect={avg_true_defect:.4f}, cooperate={avg_true_cooperate:.4f}]")
         
         return kl_loss
     

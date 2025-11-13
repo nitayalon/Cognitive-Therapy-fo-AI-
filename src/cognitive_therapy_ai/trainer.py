@@ -26,6 +26,7 @@ from .loss import CompositeLoss, AdaptiveLoss
 from .tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss, LossAnalyzer
 from .utils import MetricsTracker, set_random_seeds
 from .config import TrainingConfig, NetworkConfig
+from .training_monitor import TrainingMonitor, BatchedTrainingMonitor
 
 
 class GameSession:
@@ -170,7 +171,6 @@ class GameSession:
             'opponent_action_logits': opponent_action_logits,
             'opponent_policy_logits': opponent_policy_logits,
             'value_estimate': value_estimate,
-            'opponent_type_pred': torch.full_like(value_estimate, self.opponent.get_type_parameter() if self.opponent.get_type_parameter() is not None else 0.0),
             'opponent_type_true': self.opponent.get_type_parameter(),
             'hidden': hidden,
             'new_hidden': new_hidden,
@@ -195,15 +195,21 @@ class GameSession:
         opponent_action_logits = torch.cat([data['opponent_action_logits'] for data in self.session_data], dim=0)
         opponent_policy_logits = torch.cat([data['opponent_policy_logits'] for data in self.session_data], dim=0)
         value_estimates = torch.cat([data['value_estimate'] for data in self.session_data], dim=0)
-        opponent_type_preds = torch.cat([data['opponent_type_pred'] for data in self.session_data], dim=0)
         
         # True opponent type (same for all games in session)
         opponent_type_true = self.session_data[0]['opponent_type_true']
         if opponent_type_true is not None:
             opponent_type_tensor = torch.full((len(self.session_data), 1), opponent_type_true, dtype=torch.float32)
-            # Create true opponent policy tensor: [p_defect, p_cooperate] = [1-p_d, p_d]
+            # CRITICAL: Create true opponent policy tensor matching network output format
+            # Network opponent_policy_head outputs: [defect_logit, cooperate_logit] (index 0=defect, 1=cooperate)
+            # True policy should match this format: [p_defect, p_cooperate]
             p_d = opponent_type_true  # defection probability from opponent type
-            true_opponent_policy = torch.tensor([[1-p_d, p_d]], dtype=torch.float32).expand(len(self.session_data), -1)
+            p_c = 1.0 - p_d  # cooperation probability 
+            true_opponent_policy = torch.tensor([[p_d, p_c]], dtype=torch.float32).expand(len(self.session_data), -1)
+            
+            # Data consistency logging
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(f"Opponent type: {opponent_type_true:.3f} -> True policy: [defect={p_d:.3f}, cooperate={p_c:.3f}]")
         else:
             opponent_type_tensor = torch.zeros((len(self.session_data), 1), dtype=torch.float32)
             # Default uniform policy if opponent type unknown
@@ -223,7 +229,6 @@ class GameSession:
                 'opponent_action_logits': opponent_action_logits,
                 'opponent_policy_logits': opponent_policy_logits,
                 'value_estimate': value_estimates,
-                'opponent_type_pred': opponent_type_preds,
                 'opponent_type_true': opponent_type_tensor,
                 'true_opponent_policy': true_opponent_policy
             },
@@ -290,6 +295,10 @@ class GameTrainer:
         self.metrics_tracker = MetricsTracker()
         self.network_manager = NetworkManager(self.network, self.device)
         
+        # Training monitor for detailed logging (initialized when training starts)
+        self.training_monitor: Optional[BatchedTrainingMonitor] = None
+        self.detailed_logging_enabled = False
+        
         # Training state
         self.current_epoch = 0
         self.best_loss = float('inf')
@@ -300,6 +309,26 @@ class GameTrainer:
         self.epoch_cooperation_rates = []  # Store network cooperation rates per epoch
         
         self.logger = logging.getLogger(__name__)
+    
+    def enable_detailed_logging(self, output_dir: str, save_frequency: int = 50):
+        """
+        Enable detailed training monitoring and logging.
+        
+        Args:
+            output_dir: Directory to save detailed training logs
+            save_frequency: How often to save logs to disk (iterations)
+        """
+        self.detailed_logging_enabled = True
+        self.training_monitor = BatchedTrainingMonitor(output_dir, save_frequency)
+        self.logger.info(f"Detailed training logging enabled. Logs will be saved to {output_dir}")
+    
+    def disable_detailed_logging(self):
+        """Disable detailed training monitoring."""
+        if self.training_monitor is not None:
+            self.training_monitor.finalize()
+        self.detailed_logging_enabled = False
+        self.training_monitor = None
+        self.logger.info("Detailed training logging disabled")
     
     def train_on_game(
         self,
@@ -321,6 +350,11 @@ class GameTrainer:
             Dictionary with training results
         """
         self.logger.info(f"Starting training on {game_name} with {len(opponents)} opponents")
+        
+        # Enable detailed logging if save_dir is provided
+        if save_dir and not self.detailed_logging_enabled:
+            detailed_log_dir = os.path.join(save_dir, 'detailed_training_logs')
+            self.enable_detailed_logging(detailed_log_dir)
         
         # Create game instance
         game_kwargs = game_kwargs or {}
@@ -371,6 +405,10 @@ class GameTrainer:
                 self.best_loss
             )
         
+        # Finalize detailed logging
+        if self.detailed_logging_enabled:
+            self.disable_detailed_logging()
+        
         return training_results
 
     def train_on_multiple_games(
@@ -398,6 +436,11 @@ class GameTrainer:
             Dictionary with multi-game training results
         """
         self.logger.info(f"Starting simultaneous training on {len(game_configs)} games")
+        
+        # Enable detailed logging if save_dir is provided
+        if save_dir and not self.detailed_logging_enabled:
+            detailed_log_dir = os.path.join(save_dir, 'detailed_training_logs')
+            self.enable_detailed_logging(detailed_log_dir, save_frequency=25)  # More frequent saves for multi-game
         
         # Initialize games
         games = {}
@@ -451,6 +494,10 @@ class GameTrainer:
                     epoch, 
                     epoch_results['total_loss']
                 )
+            
+            # Interim summary report every 100 epochs
+            if epoch > 0 and epoch % 100 == 0:
+                self._log_interim_summary(training_results, epoch)
         
         # Final results
         training_results['final_metrics'] = self._compile_multi_game_final_metrics(games)
@@ -464,6 +511,10 @@ class GameTrainer:
                 self.current_epoch,
                 self.best_loss
             )
+        
+        # Finalize detailed logging
+        if self.detailed_logging_enabled:
+            self.disable_detailed_logging()
         
         return training_results
 
@@ -612,10 +663,25 @@ class GameTrainer:
             self.optimizer.zero_grad()
             loss_dict['total_loss'].backward()
             
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
+            # Gradient clipping and record gradient norm
+            gradient_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
             
             self.optimizer.step()
+            
+            # Detailed logging if enabled
+            if self.detailed_logging_enabled and self.training_monitor is not None:
+                # Update gradient norm for logging
+                self.training_monitor.update_gradient_norm(gradient_norm.item())
+                
+                # Log the complete training batch
+                self.training_monitor.log_training_batch(
+                    loss_dict=loss_dict,
+                    training_data=training_data,
+                    session_results=session_results,
+                    epoch=self.current_epoch,
+                    game_name=game.get_name(),
+                    opponent_name=opponent.get_strategy_name()
+                )
             
             # Record results (handle multi-element tensors properly)
             epoch_loss_record = {}
@@ -737,10 +803,35 @@ class GameTrainer:
         self.optimizer.zero_grad()
         loss_dict['total_loss'].backward()
         
-        # Gradient clipping
-        torch.nn.utils.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
+        # Gradient clipping and record gradient norm
+        gradient_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
         
         self.optimizer.step()
+        
+        # Detailed logging if enabled (log each training data point in the batch)
+        if self.detailed_logging_enabled and self.training_monitor is not None:
+            # Update gradient norm for logging
+            self.training_monitor.update_gradient_norm(gradient_norm.item())
+            
+            # Log each training data point from all games
+            for training_data in all_training_data:
+                # Create dummy session results for the monitor
+                dummy_session_results = {
+                    'session_stats': {
+                        'opponent_type': 0.5,  # Default value
+                        'opponent_name': training_data.get('opponent_name', 'unknown')
+                    }
+                }
+                
+                # Log this training batch
+                self.training_monitor.log_training_batch(
+                    loss_dict=loss_dict,
+                    training_data=training_data,
+                    session_results=dummy_session_results,
+                    epoch=self.current_epoch,
+                    game_name=training_data.get('game_name', 'unknown'),
+                    opponent_name=training_data.get('opponent_name', 'unknown')
+                )
         
         # Calculate per-game loss breakdown for analysis
         per_game_losses = self._calculate_per_game_losses(all_training_data, games)
@@ -776,6 +867,18 @@ class GameTrainer:
                 epoch_cumulative_reward += stats.get('cumulative_reward', 0.0)
                 epoch_cooperation_rates.append(stats.get('cooperation_rate', 0.0))
         
+        # Calculate average policy probabilities for interim reporting
+        with torch.no_grad():
+            # Agent policy probabilities (from mixed batch)
+            agent_policy_probs = torch.softmax(mixed_batch['policy_logits'], dim=-1)
+            avg_agent_coop_prob = agent_policy_probs[:, 0].mean().item()  # Cooperation probability (action 0)
+            avg_agent_defect_prob = agent_policy_probs[:, 1].mean().item()  # Defection probability (action 1)
+            
+            # Predicted opponent policy probabilities (from mixed batch)
+            pred_opp_policy_probs = torch.softmax(mixed_batch['opponent_policy_logits'], dim=-1)
+            avg_pred_opp_defect_prob = pred_opp_policy_probs[:, 0].mean().item()  # Defection probability (output 0)
+            avg_pred_opp_coop_prob = pred_opp_policy_probs[:, 1].mean().item()  # Cooperation probability (output 1)
+        
         # Track epoch-level metrics
         avg_cooperation_rate = np.mean(epoch_cooperation_rates) if epoch_cooperation_rates else 0.0
         self.epoch_rewards.append(epoch_cumulative_reward)
@@ -789,7 +892,15 @@ class GameTrainer:
             'num_sessions_per_game': {game: len(stats) for game, stats in game_session_stats.items()},
             'total_sessions': len(all_training_data),
             'epoch_cumulative_reward': epoch_cumulative_reward,
-            'epoch_average_cooperation_rate': avg_cooperation_rate
+            'epoch_average_cooperation_rate': avg_cooperation_rate,
+            'agent_policy_probs': {
+                'cooperate': avg_agent_coop_prob,
+                'defect': avg_agent_defect_prob
+            },
+            'predicted_opponent_policy_probs': {
+                'cooperate': avg_pred_opp_coop_prob,
+                'defect': avg_pred_opp_defect_prob
+            }
         }
         
         # Update adaptive loss if applicable
@@ -817,7 +928,7 @@ class GameTrainer:
         # Initialize batch with first item structure
         batch = {}
         tensor_keys = ['policy_logits', 'opponent_action_logits', 'opponent_policy_logits', 'value_estimate', 
-                      'opponent_type_pred', 'actions', 'rewards', 'opponent_actions', 'opponent_type_true', 'true_opponent_policy']
+                       'actions', 'rewards', 'opponent_actions', 'opponent_type_true', 'true_opponent_policy']
         
         for key in tensor_keys:
             tensors_to_concat = []
@@ -834,7 +945,7 @@ class GameTrainer:
                     # Each session contributes (T,) -> concatenate to (total_T,)
                     batch[key] = torch.cat(tensors_to_concat, dim=0)
                 elif key in ['policy_logits', 'opponent_action_logits', 'opponent_policy_logits', 'value_estimate', 
-                           'opponent_type_pred', 'opponent_type_true', 'true_opponent_policy']:
+                           'opponent_type_true', 'true_opponent_policy']:
                     # These should be 2D after concatenation 
                     # Each session contributes (T, features) -> concatenate to (total_T, features)
                     batch[key] = torch.cat(tensors_to_concat, dim=0)
@@ -996,7 +1107,8 @@ class GameTrainer:
     
     def _check_convergence(self) -> bool:
         """Check if training has converged."""
-        # Early stopping based on loss improvement
+        # DISABLED: Early termination criteria for full epoch training
+        # Still track loss improvement for metrics, but don't terminate early
         current_loss = self.loss_analyzer.loss_history['total']
         if current_loss:
             latest_loss = current_loss[-1]
@@ -1006,23 +1118,15 @@ class GameTrainer:
             else:
                 self.patience_counter += 1
         
-        # Check patience
-        if self.patience_counter >= self.config.patience:
-            return True
+        # DISABLED: All early termination conditions
+        # Training will run for the full number of epochs (config.max_epochs)
         
-        # Check loss convergence using ToM-RL LossAnalyzer
-        if hasattr(self.loss_analyzer, 'check_convergence'):
-            if self.loss_analyzer.check_convergence('total', threshold=self.config.convergence_threshold):
-                return True
-        else:
-            # Fallback convergence check if method doesn't exist
-            if len(current_loss) >= 10:
-                recent_losses = current_loss[-10:]
-                loss_variance = torch.tensor(recent_losses).var().item()
-                if loss_variance < self.config.convergence_threshold:
-                    return True
+        # Original convergence checks (commented out):
+        # - Patience-based early stopping
+        # - Loss variance convergence 
+        # - LossAnalyzer convergence detection
         
-        return False
+        return False  # Never terminate early - always train full epochs
     
     def _compile_final_metrics(self) -> Dict[str, Any]:
         """Compile final training metrics."""
@@ -1305,3 +1409,83 @@ class GameTrainer:
                 summary_lines.append(f"Last 5 Epochs Cooperation: {[f'{c:.3f}' for c in recent_coop]}")
         
         return "\n".join(summary_lines)
+
+    def _log_interim_summary(self, training_results: Dict[str, Any], current_epoch: int):
+        """
+        Log interim summary report every 100 epochs during multi-game training.
+        
+        Args:
+            training_results: Current training results dictionary
+            current_epoch: Current epoch number
+        """
+        # Get last 10 epochs of data for averaging (or fewer if not available)
+        num_epochs_to_average = min(10, len(training_results['epoch_results']))
+        if num_epochs_to_average == 0:
+            return
+        
+        recent_epochs = training_results['epoch_results'][-num_epochs_to_average:]
+        
+        # Calculate average agent policy probabilities over last 10 epochs
+        agent_coop_probs = []
+        agent_defect_probs = []
+        
+        # Calculate average predicted opponent policy probabilities over last 10 epochs  
+        pred_opp_coop_probs = []
+        pred_opp_defect_probs = []
+        
+        # Calculate average rewards over last 10 epochs
+        avg_rewards = []
+        
+        for epoch_result in recent_epochs:
+            # Extract agent policy probabilities
+            if 'agent_policy_probs' in epoch_result:
+                agent_coop_probs.append(epoch_result['agent_policy_probs']['cooperate'])
+                agent_defect_probs.append(epoch_result['agent_policy_probs']['defect'])
+            
+            # Extract predicted opponent policy probabilities
+            if 'predicted_opponent_policy_probs' in epoch_result:
+                pred_opp_coop_probs.append(epoch_result['predicted_opponent_policy_probs']['cooperate'])
+                pred_opp_defect_probs.append(epoch_result['predicted_opponent_policy_probs']['defect'])
+            
+            # Extract average reward
+            if 'epoch_cumulative_reward' in epoch_result:
+                avg_rewards.append(epoch_result['epoch_cumulative_reward'])
+        
+        # Calculate averages
+        avg_agent_coop = np.mean(agent_coop_probs) if agent_coop_probs else 0.0
+        avg_agent_defect = np.mean(agent_defect_probs) if agent_defect_probs else 0.0
+        
+        avg_pred_opp_coop = np.mean(pred_opp_coop_probs) if pred_opp_coop_probs else 0.0
+        avg_pred_opp_defect = np.mean(pred_opp_defect_probs) if pred_opp_defect_probs else 0.0
+        
+        avg_reward = np.mean(avg_rewards) if avg_rewards else 0.0
+        
+        # Enhanced diagnostics - extract loss component information
+        loss_ratios = []
+        alpha_contributions = []
+        for epoch_result in recent_epochs:
+            if 'mixed_batch_loss' in epoch_result:
+                loss_info = epoch_result['mixed_batch_loss']
+                if 'loss_ratio' in loss_info:
+                    loss_ratios.append(loss_info['loss_ratio'])
+                if 'alpha_contribution' in loss_info:
+                    alpha_contributions.append(loss_info['alpha_contribution'])
+        
+        avg_loss_ratio = np.mean(loss_ratios) if loss_ratios else 0.0
+        avg_alpha_contribution = np.mean(alpha_contributions) if alpha_contributions else 0.0
+        
+        # Log comprehensive interim summary
+        self.logger.info(f"=== INTERIM SUMMARY - EPOCH {current_epoch} ===")
+        self.logger.info(f"Average over last {num_epochs_to_average} epochs:")
+        self.logger.info(f"Agent Policy - Cooperate: {avg_agent_coop:.4f}, Defect: {avg_agent_defect:.4f}")
+        self.logger.info(f"Predicted Opponent Policy - Cooperate: {avg_pred_opp_coop:.4f}, Defect: {avg_pred_opp_defect:.4f}")
+        self.logger.info(f"Average Reward: {avg_reward:.4f}")
+        self.logger.info(f"Loss Analysis - OpPolicy/RL Ratio: {avg_loss_ratio:.4f}, Alpha Contribution: {avg_alpha_contribution:.4f}")
+        
+        # Policy prediction accuracy check
+        if avg_pred_opp_coop > 0 and avg_pred_opp_defect > 0:
+            policy_entropy = -(avg_pred_opp_coop * np.log(avg_pred_opp_coop + 1e-8) + 
+                             avg_pred_opp_defect * np.log(avg_pred_opp_defect + 1e-8))
+            self.logger.info(f"Opponent Policy Prediction Entropy: {policy_entropy:.4f} (lower = more confident)")
+        
+        self.logger.info("=" * 60)

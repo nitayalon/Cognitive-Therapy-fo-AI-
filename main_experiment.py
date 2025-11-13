@@ -471,30 +471,110 @@ def create_multi_game_report(
     # If there's per-game breakdown in the epoch results, add that too
     if training_result.get('epoch_results') and training_result['epoch_results']:
         last_epoch = training_result['epoch_results'][-1]
+        epoch_results = training_result['epoch_results']
+        
         if 'per_game_losses' in last_epoch:
             report['training_phase']['per_game_breakdown'] = {}
+            
+            # Calculate averages over last 10 epochs for each training game
+            num_epochs = len(epoch_results)
+            last_10_epochs = epoch_results[-10:] if num_epochs >= 10 else epoch_results
+            
             for game_name, losses in last_epoch['per_game_losses'].items():
+                # Calculate average reward over last 10 epochs
+                avg_reward = 0.0
+                avg_policy = [0.0, 0.0]  # [cooperate_prob, defect_prob]
+                valid_epochs = 0
+                
+                for epoch_data in last_10_epochs:
+                    # Look for game session stats which contains the metrics we need
+                    if 'game_session_stats' in epoch_data and game_name in epoch_data['game_session_stats']:
+                        game_sessions = epoch_data['game_session_stats'][game_name]
+                        if isinstance(game_sessions, list) and len(game_sessions) > 0:
+                            # Average across all sessions for this game in this epoch
+                            epoch_avg_reward = 0.0
+                            epoch_coop_rate = 0.0
+                            valid_sessions = 0
+                            
+                            for session in game_sessions:
+                                if isinstance(session, dict):
+                                    if 'average_reward' in session:
+                                        epoch_avg_reward += session['average_reward']
+                                        valid_sessions += 1
+                                    if 'cooperation_rate' in session:
+                                        epoch_coop_rate += session['cooperation_rate']
+                            
+                            if valid_sessions > 0:
+                                epoch_avg_reward /= valid_sessions
+                                epoch_coop_rate /= valid_sessions
+                                
+                                avg_reward += epoch_avg_reward
+                                avg_policy[0] += epoch_coop_rate  # cooperate_prob
+                                avg_policy[1] += (1.0 - epoch_coop_rate)  # defect_prob
+                                valid_epochs += 1
+                    
+                    # Also check if there are agent_policy_probs at epoch level
+                    elif 'agent_policy_probs' in epoch_data:
+                        agent_probs = epoch_data['agent_policy_probs']
+                        if isinstance(agent_probs, dict):
+                            coop_prob = agent_probs.get('cooperate', 0.0)
+                            defect_prob = agent_probs.get('defect', 0.0)
+                            avg_policy[0] += coop_prob
+                            avg_policy[1] += defect_prob
+                            
+                            # Use epoch-level reward if available
+                            if 'epoch_cumulative_reward' in epoch_data:
+                                # Estimate average reward (this is cumulative, so we'll use it as-is for now)
+                                avg_reward += float(epoch_data.get('epoch_cumulative_reward', 0.0))
+                                valid_epochs += 1
+                
+                # Normalize averages
+                if valid_epochs > 0:
+                    avg_reward /= valid_epochs
+                    avg_policy[0] /= valid_epochs
+                    avg_policy[1] /= valid_epochs
+                
                 report['training_phase']['per_game_breakdown'][game_name] = {
                     'final_loss': losses.get('total_loss', float('inf')),
                     'rl_loss': losses.get('rl_loss', 0.0),
-                    'opponent_prediction_loss': losses.get('opponent_prediction_loss', 0.0)
+                    'opponent_prediction_loss': losses.get('opponent_prediction_loss', 0.0),
+                    'avg_reward_last_10_epochs': avg_reward,
+                    'learned_policy_last_10_epochs': {
+                        'cooperate_prob': avg_policy[0],
+                        'defect_prob': avg_policy[1]
+                    },
+                    'epochs_averaged': min(10, num_epochs)
                 }
     
     # Process test results
     test_result = results['test_results']
     report['testing_phase'][results['test_game']] = {
-        'performance_metrics': {}
+        'performance_metrics': {},
+        'test_game_summary': {}
     }
+    
+    # Calculate overall test game averages across all opponents
+    total_avg_reward = 0.0
+    total_cooperation_rate = 0.0
+    valid_opponents = 0
     
     # Extract test performance for each opponent (with safety checks)
     if isinstance(test_result, dict):
         for opponent_name, opponent_stats in test_result.items():
             if isinstance(opponent_stats, dict):
+                avg_reward = opponent_stats.get('average_reward', 0)
+                cooperation_rate = opponent_stats.get('cooperation_rate', 0)
+                
                 report['testing_phase'][results['test_game']]['performance_metrics'][opponent_name] = {
-                    'avg_reward': opponent_stats.get('average_reward', 0),
-                    'cooperation_rate': opponent_stats.get('cooperation_rate', 0),
+                    'avg_reward': avg_reward,
+                    'cooperation_rate': cooperation_rate,
                     'win_rate': opponent_stats.get('win_rate', 0)
                 }
+                
+                # Accumulate for overall averages
+                total_avg_reward += avg_reward
+                total_cooperation_rate += cooperation_rate
+                valid_opponents += 1
             else:
                 # Fallback for unexpected data structure
                 report['testing_phase'][results['test_game']]['performance_metrics'][opponent_name] = {
@@ -503,10 +583,34 @@ def create_multi_game_report(
                     'win_rate': 0,
                     'error': 'Unexpected data structure'
                 }
+        
+        # Calculate test game summary averages
+        if valid_opponents > 0:
+            report['testing_phase'][results['test_game']]['test_game_summary'] = {
+                'avg_reward_across_opponents': total_avg_reward / valid_opponents,
+                'learned_policy_across_opponents': {
+                    'cooperate_prob': total_cooperation_rate / valid_opponents,
+                    'defect_prob': 1.0 - (total_cooperation_rate / valid_opponents)
+                },
+                'num_opponents_tested': valid_opponents
+            }
+        else:
+            report['testing_phase'][results['test_game']]['test_game_summary'] = {
+                'avg_reward_across_opponents': 0.0,
+                'learned_policy_across_opponents': {
+                    'cooperate_prob': 0.0,
+                    'defect_prob': 0.0
+                },
+                'num_opponents_tested': 0,
+                'error': 'No valid opponent data found'
+            }
     else:
         # Handle case where test_result is not a dict
         report['testing_phase'][results['test_game']]['performance_metrics'] = {
             'error': f'Test results have unexpected type: {type(test_result)}'
+        }
+        report['testing_phase'][results['test_game']]['test_game_summary'] = {
+            'error': 'Unable to process test results'
         }
     
     # Save detailed report
@@ -543,6 +647,12 @@ def create_multi_game_report(
                 print(f"    Final Loss: {game_info.get('final_loss', float('inf')):.6f}")
                 print(f"    RL Loss: {game_info.get('rl_loss', 0.0):.6f}")
                 print(f"    Opponent Pred Loss: {game_info.get('opponent_prediction_loss', 0.0):.6f}")
+                print(f"    Avg Reward (last {game_info.get('epochs_averaged', 0)} epochs): {game_info.get('avg_reward_last_10_epochs', 0.0):.4f}")
+                
+                learned_policy = game_info.get('learned_policy_last_10_epochs', {})
+                coop_prob = learned_policy.get('cooperate_prob', 0.0)
+                defect_prob = learned_policy.get('defect_prob', 0.0)
+                print(f"    Learned Policy (last {game_info.get('epochs_averaged', 0)} epochs): Coop={coop_prob:.3f}, Defect={defect_prob:.3f}")
         else:
             # Fallback for any other structure
             print(f"\n{section_name.upper()}:")
@@ -551,13 +661,30 @@ def create_multi_game_report(
             print(f"  Converged: {training_info.get('convergence_achieved', False)}")
     
     print(f"\n--- TESTING PHASE ({results['test_game'].upper()}) ---")
+    
+    # Print overall test game summary first
+    test_summary = report['testing_phase'][results['test_game']].get('test_game_summary', {})
+    if 'error' not in test_summary:
+        print(f"\nOVERALL TEST GAME PERFORMANCE:")
+        print(f"  Average Reward (across {test_summary.get('num_opponents_tested', 0)} opponents): {test_summary.get('avg_reward_across_opponents', 0.0):.4f}")
+        
+        learned_policy = test_summary.get('learned_policy_across_opponents', {})
+        coop_prob = learned_policy.get('cooperate_prob', 0.0)
+        defect_prob = learned_policy.get('defect_prob', 0.0)
+        print(f"  Learned Policy (across opponents): Coop={coop_prob:.3f}, Defect={defect_prob:.3f}")
+    
+    # Print per-opponent breakdown
+    print(f"\nPER-OPPONENT BREAKDOWN:")
     test_metrics = report['testing_phase'][results['test_game']]['performance_metrics']
     for opponent, metrics in test_metrics.items():
-        print(f"\n{opponent}:")
-        print(f"  Average Reward: {metrics['avg_reward']:.4f}")
-        print(f"  Cooperation Rate: {metrics['cooperation_rate']:.2%}")
-        if 'win_rate' in metrics:
-            print(f"  Win Rate: {metrics['win_rate']:.2%}")
+        if 'error' not in metrics:
+            print(f"\n{opponent}:")
+            print(f"  Average Reward: {metrics['avg_reward']:.4f}")
+            print(f"  Cooperation Rate: {metrics['cooperation_rate']:.2%}")
+            if 'win_rate' in metrics:
+                print(f"  Win Rate: {metrics['win_rate']:.2%}")
+        else:
+            print(f"\n{opponent}: {metrics.get('error', 'Unknown error')}")
     
     print(f"\n{'='*70}")
     print(f"Results saved to: {output_dirs['results']}")
@@ -594,7 +721,7 @@ def main():
     
     # Parse opponent probabilities
     opponent_probs = [float(p.strip()) for p in args.opponents.split(',')]
-    logger.info(f"Opponent cooperation probabilities: {opponent_probs}")
+    logger.info(f"Opponent defection probabilities: {opponent_probs}")
     
     # Create configurations
     network_config = NetworkConfig()
