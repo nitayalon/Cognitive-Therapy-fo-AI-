@@ -7,18 +7,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
-- **Detailed Training Monitor (2025-11-13)**: Comprehensive step-by-step training documentation
-  - New `TrainingMonitor` and `BatchedTrainingMonitor` classes for detailed logging
-  - Logs all loss components (RL, opponent prediction, total) for each training iteration
-  - Records network head outputs (policy logits, opponent policy logits, value estimates)
-  - Tracks sampled actions from network policy and opponent actions
-  - Documents rewards received by both agent and opponent
-  - Real-time table updates saved as CSV and Excel files every 50-100 iterations
-  - Automatic gradient norm tracking and logging
-  - Integration with both single-game and multi-game training modes
-  - Detailed logging enabled automatically when save_dir is provided
-  - Comprehensive final summaries and training statistics
-  - Files: `src/cognitive_therapy_ai/training_monitor.py`, enhanced `trainer.py`
+- **Complete Training & Testing Documentation System (2025-11-13)**: Comprehensive monitoring pipeline
+  - **Training Phase Monitoring**: 
+    - New `TrainingMonitor` and `BatchedTrainingMonitor` classes for detailed logging
+    - Logs all loss components (RL, opponent prediction, total) for each training iteration
+    - Records network head outputs (policy logits, opponent policy logits, value estimates)
+    - Tracks sampled actions from network policy and opponent actions
+    - Documents rewards received by both agent and opponent
+    - Real-time table updates saved as CSV and Excel files every 50-100 iterations
+    - Automatic gradient norm tracking and logging
+    - Integration with both single-game and multi-game training modes
+    - Files: `src/cognitive_therapy_ai/training_monitor.py`, enhanced `trainer.py`
+  
+  - **Testing Phase Monitoring**:
+    - New `TestingMonitor` class for comprehensive evaluation documentation
+    - Logs network predictions vs true opponent behavior during testing
+    - Records policy outputs, value estimates, and action distributions
+    - Tracks sampled actions for both agent and opponent during evaluation
+    - Documents rewards and game outcomes for each test step
+    - Session-based organization with detailed game and opponent information
+    - CSV and Excel output with comprehensive column schemas
+    - Files: `src/cognitive_therapy_ai/testing_monitor.py`
+  
+  - **Network Serial ID System**:
+    - UUID-based network identification for linking training and testing data
+    - Automatic serial ID generation and tracking throughout training lifecycle
+    - Linkage files connecting training logs to testing logs for analysis
+    - Enhanced trainer with network identification methods
+    - Complete data traceability from training through evaluation phases
+  
+  - **Enhanced Evaluation Methods**:
+    - Updated `evaluate()` and `evaluate_on_multiple_games()` methods with monitoring
+    - Detailed step-by-step logging during evaluation sessions
+    - Automatic monitoring enabling when directories are provided
+    - Comprehensive session management and result aggregation
+  
+  - **Demo and Configuration**:
+    - New `complete_monitoring_demo.py` demonstrating full monitoring pipeline
+    - Enhanced VS Code launch configurations for testing new features
+    - Automatic monitoring activation when save directories are provided
 
 ### Changed
 - **Loss Function Enhancement (2025-10-20)**: Replaced opponent action prediction with opponent policy prediction

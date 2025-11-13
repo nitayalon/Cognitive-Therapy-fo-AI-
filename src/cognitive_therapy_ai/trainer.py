@@ -27,6 +27,7 @@ from .tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss, LossAnalyzer
 from .utils import MetricsTracker, set_random_seeds
 from .config import TrainingConfig, NetworkConfig
 from .training_monitor import TrainingMonitor, BatchedTrainingMonitor
+from .testing_monitor import TestingMonitor
 
 
 class GameSession:
@@ -295,9 +296,16 @@ class GameTrainer:
         self.metrics_tracker = MetricsTracker()
         self.network_manager = NetworkManager(self.network, self.device)
         
+        # Network serial ID for linking training and testing data
+        self.network_serial_id = self._generate_network_serial_id()
+        
         # Training monitor for detailed logging (initialized when training starts)
         self.training_monitor: Optional[BatchedTrainingMonitor] = None
         self.detailed_logging_enabled = False
+        
+        # Testing monitor for evaluation phases
+        self.testing_monitor: Optional[TestingMonitor] = None
+        self.testing_logging_enabled = False
         
         # Training state
         self.current_epoch = 0
@@ -310,6 +318,18 @@ class GameTrainer:
         
         self.logger = logging.getLogger(__name__)
     
+    def _generate_network_serial_id(self) -> str:
+        """Generate a unique serial ID for the network to link training and testing data."""
+        import uuid
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        return f"NET_{timestamp}_{unique_id}"
+    
+    def get_network_serial_id(self) -> str:
+        """Get the network's unique serial ID."""
+        return self.network_serial_id
+    
     def enable_detailed_logging(self, output_dir: str, save_frequency: int = 50):
         """
         Enable detailed training monitoring and logging.
@@ -320,7 +340,9 @@ class GameTrainer:
         """
         self.detailed_logging_enabled = True
         self.training_monitor = BatchedTrainingMonitor(output_dir, save_frequency)
-        self.logger.info(f"Detailed training logging enabled. Logs will be saved to {output_dir}")
+        # Pass network serial ID to training monitor
+        self.training_monitor.network_serial_id = self.network_serial_id
+        self.logger.info(f"Detailed training logging enabled for network {self.network_serial_id}. Logs will be saved to {output_dir}")
     
     def disable_detailed_logging(self):
         """Disable detailed training monitoring."""
@@ -329,6 +351,26 @@ class GameTrainer:
         self.detailed_logging_enabled = False
         self.training_monitor = None
         self.logger.info("Detailed training logging disabled")
+    
+    def enable_testing_monitoring(self, output_dir: str, save_frequency: int = 25):
+        """
+        Enable detailed testing monitoring and logging.
+        
+        Args:
+            output_dir: Directory to save detailed testing logs
+            save_frequency: How often to save logs to disk (iterations)
+        """
+        self.testing_logging_enabled = True
+        self.testing_monitor = TestingMonitor(output_dir, self.network_serial_id, save_frequency)
+        self.logger.info(f"Detailed testing logging enabled for network {self.network_serial_id}. Logs will be saved to {output_dir}")
+    
+    def disable_testing_monitoring(self):
+        """Disable detailed testing monitoring."""
+        if self.testing_monitor is not None:
+            self.testing_monitor.finalize()
+        self.testing_logging_enabled = False
+        self.testing_monitor = None
+        self.logger.info("Detailed testing logging disabled")
     
     def train_on_game(
         self,
@@ -1187,7 +1229,9 @@ class GameTrainer:
         self,
         game: MixedMotiveGame,
         opponents: List[Opponent],
-        num_sessions: int = 10
+        num_sessions: int = 10,
+        enable_detailed_testing: bool = True,
+        testing_log_dir: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Evaluate the trained network.
@@ -1196,6 +1240,8 @@ class GameTrainer:
             game: Game to evaluate on
             opponents: Opponents to evaluate against
             num_sessions: Number of evaluation sessions per opponent
+            enable_detailed_testing: Whether to enable detailed testing logs
+            testing_log_dir: Directory for testing logs (auto-generated if None and detailed testing enabled)
             
         Returns:
             Evaluation results
@@ -1203,13 +1249,25 @@ class GameTrainer:
         self.network.eval()
         evaluation_results = defaultdict(list)
         
+        # Enable testing monitoring if requested
+        if enable_detailed_testing and not self.testing_logging_enabled:
+            if testing_log_dir is None:
+                testing_log_dir = f"testing_logs_{self.network_serial_id}"
+            self.enable_testing_monitoring(testing_log_dir)
+        
+        # Start a new test session if monitoring is enabled
+        if self.testing_monitor is not None:
+            self.testing_monitor.start_test_session(f"evaluation_{game.get_name()}")
+        
         with torch.no_grad():
             for opponent in opponents:
                 opponent_results = []
                 
                 for session_num in range(num_sessions):
-                    session = GameSession(game, opponent, self.network, self.config.num_games_per_partner, training_mode=False)
-                    session_results = session.play_session(self.device)
+                    # Play session for evaluation
+                    session_results = self._evaluate_session_with_monitoring(
+                        game, opponent, session_num, num_sessions
+                    )
                     
                     if session_results:
                         opponent_results.append(session_results['session_stats'])
@@ -1223,13 +1281,130 @@ class GameTrainer:
                     
                     evaluation_results[opponent.get_strategy_name()] = avg_results
         
+        # Finalize test session if monitoring is enabled
+        if self.testing_monitor is not None:
+            self.testing_monitor.finalize_session()
+        
         return dict(evaluation_results)
+    
+    def _evaluate_session_with_monitoring(
+        self,
+        game: MixedMotiveGame,
+        opponent: Opponent,
+        session_num: int,
+        total_sessions: int
+    ) -> Dict[str, Any]:
+        """
+        Evaluate a single session with detailed monitoring.
+        
+        Args:
+            game: Game to play
+            opponent: Opponent to play against
+            session_num: Current session number
+            total_sessions: Total number of sessions
+            
+        Returns:
+            Session results
+        """
+        # Reset game and opponent
+        game.reset()
+        opponent.reset()
+        
+        # Initialize hidden state
+        hidden = self.network.init_hidden(1, self.device)
+        
+        session_stats = {
+            'cumulative_reward': 0.0,
+            'cooperation_count': 0,
+            'total_games': self.config.num_games_per_partner
+        }
+        
+        # Play each game in the session
+        for game_step in range(self.config.num_games_per_partner):
+            # Get current state
+            state_vector = game.get_state_vector()
+            state_tensor = torch.from_numpy(state_vector).float().unsqueeze(0).to(self.device)
+            
+            # Get network outputs
+            policy_logits, opponent_policy_logits, value_estimate, new_hidden = self.network.forward(state_tensor, hidden)
+            
+            # Sample action from policy
+            action_probs = torch.softmax(policy_logits, dim=-1)
+            action_dist = torch.distributions.Categorical(action_probs)
+            action_idx = action_dist.sample()
+            
+            # Convert to Action enum
+            from .games import Action
+            agent_action = Action.COOPERATE if action_idx.item() == 0 else Action.DEFECT
+            
+            # Opponent chooses action
+            opponent_action = opponent.play_action(game.history, game_step)
+            
+            # Play the round
+            agent_reward, opponent_reward = game.play_round(agent_action, opponent_action)
+            opponent.update_payoff(opponent_reward)
+            
+            # Update session stats
+            session_stats['cumulative_reward'] += agent_reward
+            if agent_action == Action.COOPERATE:
+                session_stats['cooperation_count'] += 1
+            
+            # Log to testing monitor if enabled
+            if self.testing_monitor is not None:
+                # Create network outputs dictionary
+                network_outputs = {
+                    'policy_logits': policy_logits.squeeze(0),
+                    'opponent_policy_logits': opponent_policy_logits.squeeze(0),
+                    'value_estimate': value_estimate.squeeze(0)
+                }
+                
+                # Get true opponent policy
+                opponent_type = opponent.get_type_parameter()
+                true_opponent_policy = None
+                if opponent_type is not None:
+                    # [defect_prob, cooperate_prob]
+                    true_opponent_policy = torch.tensor([opponent_type, 1.0 - opponent_type])
+                
+                # Log the test step
+                self.testing_monitor.log_test_step(
+                    network_outputs=network_outputs,
+                    agent_action=action_idx.item(),
+                    opponent_action=opponent_action.value,
+                    agent_reward=agent_reward,
+                    opponent_reward=opponent_reward,
+                    game_step=game_step,
+                    total_games_in_session=self.config.num_games_per_partner,
+                    game_name=game.get_name(),
+                    opponent_name=opponent.get_strategy_name(),
+                    opponent_type=opponent_type or 0.5,
+                    true_opponent_policy=true_opponent_policy
+                )
+            
+            # Update hidden state for next step
+            hidden = new_hidden
+        
+        # Compile session results
+        session_results = {
+            'session_stats': {
+                'cumulative_reward': session_stats['cumulative_reward'],
+                'average_reward': session_stats['cumulative_reward'] / session_stats['total_games'],
+                'cooperation_rate': session_stats['cooperation_count'] / session_stats['total_games'],
+                'opponent_cooperation_rate': sum(1 for _, opp_action in game.history if opp_action == Action.COOPERATE) / len(game.history) if game.history else 0.0,
+                'num_games': session_stats['total_games'],
+                'opponent_type': opponent.get_type_parameter(),
+                'opponent_name': opponent.get_strategy_name()
+            }
+        }
+        
+        return session_results
 
     def evaluate_on_multiple_games(
         self,
         games: Dict[str, MixedMotiveGame],
         opponents: List[Opponent],
-        num_sessions: int = 10
+        num_sessions: int = 10,
+        enable_detailed_testing: bool = True,
+        testing_log_dir: Optional[str] = None
     ) -> Dict[str, Dict[str, Any]]:
         """
         Evaluate the trained network on multiple games.
@@ -1238,12 +1413,24 @@ class GameTrainer:
             games: Dictionary of game_name -> game_instance
             opponents: Opponents to evaluate against
             num_sessions: Number of evaluation sessions per opponent per game
+            enable_detailed_testing: Whether to enable detailed testing logs
+            testing_log_dir: Directory for testing logs (auto-generated if None and detailed testing enabled)
             
         Returns:
             Nested dictionary: game_name -> opponent_name -> evaluation_results
         """
         self.network.eval()
         multi_game_results = {}
+        
+        # Enable testing monitoring if requested
+        if enable_detailed_testing and not self.testing_logging_enabled:
+            if testing_log_dir is None:
+                testing_log_dir = f"multi_game_testing_logs_{self.network_serial_id}"
+            self.enable_testing_monitoring(testing_log_dir)
+        
+        # Start a new test session if monitoring is enabled
+        if self.testing_monitor is not None:
+            self.testing_monitor.start_test_session("multi_game_evaluation")
         
         with torch.no_grad():
             for game_name, game in games.items():
@@ -1254,8 +1441,10 @@ class GameTrainer:
                     opponent_results = []
                     
                     for session_num in range(num_sessions):
-                        session = GameSession(game, opponent, self.network, self.config.num_games_per_partner, training_mode=False)
-                        session_results = session.play_session(self.device)
+                        # Play session with monitoring
+                        session_results = self._evaluate_session_with_monitoring(
+                            game, opponent, session_num, num_sessions
+                        )
                         
                         if session_results:
                             opponent_results.append(session_results['session_stats'])
@@ -1270,6 +1459,10 @@ class GameTrainer:
                         game_results[opponent.get_strategy_name()] = avg_results
                 
                 multi_game_results[game_name] = dict(game_results)
+        
+        # Finalize test session if monitoring is enabled
+        if self.testing_monitor is not None:
+            self.testing_monitor.finalize_session()
         
         return multi_game_results
 

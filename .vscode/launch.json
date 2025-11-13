@@ -282,6 +282,18 @@
             "python": "${workspaceFolder}/.venv/Scripts/python.exe"
         },
         {
+            "name": "Python: Complete Monitoring Demo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/complete_monitoring_demo.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+        },
+        {
             "name": "Python: Simple Debug (No Env)",
             "type": "debugpy",
             "request": "launch",

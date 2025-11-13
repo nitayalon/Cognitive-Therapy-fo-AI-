@@ -42,6 +42,9 @@ class TrainingMonitor:
         self.save_frequency = save_frequency
         self.logger = logging.getLogger(__name__)
         
+        # Network serial ID (will be set by trainer)
+        self.network_serial_id = "unknown"
+        
         # Training data storage
         self.training_log = []
         self.iteration_count = 0
@@ -57,7 +60,7 @@ class TrainingMonitor:
         # Define column headers
         self.columns = [
             # Meta information
-            'iteration', 'epoch', 'game_step', 'timestamp',
+            'network_serial_id', 'iteration', 'epoch', 'game_step', 'timestamp',
             
             # Game context
             'game_name', 'opponent_name', 'opponent_type',
@@ -156,6 +159,7 @@ class TrainingMonitor:
         # Create log entry
         log_entry = {
             # Meta information
+            'network_serial_id': self.network_serial_id,
             'iteration': self.iteration_count,
             'epoch': epoch,
             'game_step': game_step,
