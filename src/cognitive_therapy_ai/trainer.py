@@ -318,6 +318,130 @@ class GameTrainer:
         
         self.logger = logging.getLogger(__name__)
     
+    def save_experiment_metadata(
+        self,
+        save_dir: str,
+        opponents: List[Opponent],
+        game_configs: Optional[List[Dict[str, Any]]] = None,
+        additional_params: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Save experiment metadata to a text file for documentation.
+        
+        Args:
+            save_dir: Directory to save the metadata file
+            opponents: List of opponents used in the experiment
+            game_configs: Game configurations used (if any)
+            additional_params: Additional parameters to document
+            
+        Returns:
+            Path to the created metadata file
+        """
+        import os
+        from datetime import datetime
+        
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # Create metadata filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        metadata_file = os.path.join(save_dir, f"experiment_metadata_{self.network_serial_id}_{timestamp}.txt")
+        
+        # Extract opponent information
+        opponent_probs = []
+        opponent_types = set()
+        for opp in opponents:
+            prob = opp.get_type_parameter()
+            if prob is not None:
+                opponent_probs.append(prob)
+            opponent_types.add(opp.get_strategy_name())
+        
+        # Calculate opponent statistics
+        if opponent_probs:
+            min_prob = min(opponent_probs)
+            max_prob = max(opponent_probs)
+            num_opponents = len(opponents)
+            prob_range = max_prob - min_prob
+            avg_spacing = prob_range / (num_opponents - 1) if num_opponents > 1 else 0.0
+        else:
+            min_prob = max_prob = prob_range = avg_spacing = 0.0
+            num_opponents = len(opponents)
+        
+        # Write metadata file
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            f.write("="*80 + "\n")
+            f.write("EXPERIMENT METADATA\n")
+            f.write("="*80 + "\n\n")
+            
+            f.write(f"Experiment Timestamp: {timestamp}\n")
+            f.write(f"Network Serial ID: {self.network_serial_id}\n\n")
+            
+            f.write("OPPONENT CONFIGURATION\n")
+            f.write("-"*40 + "\n")
+            f.write(f"Total Opponents: {num_opponents}\n")
+            f.write(f"Opponent Types: {', '.join(opponent_types)}\n")
+            
+            if opponent_probs:
+                f.write(f"Defection Probability Range: [{min_prob:.3f}, {max_prob:.3f}]\n")
+                f.write(f"Probability Range Span: {prob_range:.3f}\n")
+                f.write(f"Average Spacing: {avg_spacing:.3f}\n\n")
+                
+                f.write("Individual Opponent Defection Probabilities:\n")
+                sorted_probs = sorted(opponent_probs)
+                for i, prob in enumerate(sorted_probs):
+                    f.write(f"  {i+1:2d}. {prob:.3f}\n")
+                f.write("\n")
+            
+            f.write("NETWORK CONFIGURATION\n")
+            f.write("-"*40 + "\n")
+            f.write(f"Hidden Size: {self.network.hidden_size}\n")
+            f.write(f"Number of Layers: {self.network.num_layers}\n")
+            f.write(f"Input Size: {self.network.input_size}\n")
+            f.write(f"Dropout: {getattr(self.network, 'dropout', 'N/A')}\n\n")
+            
+            f.write("TRAINING CONFIGURATION\n")
+            f.write("-"*40 + "\n")
+            f.write(f"Learning Rate: {self.config.learning_rate}\n")
+            f.write(f"Max Epochs: {self.config.max_epochs}\n")
+            f.write(f"Batch Size: {self.config.batch_size}\n")
+            f.write(f"Games per Partner: {self.config.num_games_per_partner}\n")
+            f.write(f"Patience: {self.config.patience}\n")
+            f.write(f"Convergence Threshold: {self.config.convergence_threshold}\n")
+            f.write(f"Loss Type: {type(self.loss_fn).__name__}\n")
+            f.write(f"Loss Alpha: {getattr(self.loss_fn, 'alpha', 'N/A')}\n\n")
+            
+            if game_configs:
+                f.write("GAME CONFIGURATION\n")
+                f.write("-"*40 + "\n")
+                for i, config in enumerate(game_configs):
+                    f.write(f"Game {i+1}: {config.get('name', 'Unknown')}\n")
+                    f.write(f"  Weight: {config.get('weight', 1.0)}\n")
+                    if 'kwargs' in config:
+                        f.write(f"  Parameters: {config['kwargs']}\n")
+                f.write("\n")
+            
+            if additional_params:
+                f.write("ADDITIONAL PARAMETERS\n")
+                f.write("-"*40 + "\n")
+                for key, value in additional_params.items():
+                    f.write(f"{key}: {value}\n")
+                f.write("\n")
+            
+            f.write("DEVICE INFORMATION\n")
+            f.write("-"*40 + "\n")
+            f.write(f"Device: {self.device}\n")
+            f.write(f"CUDA Available: {torch.cuda.is_available()}\n")
+            if torch.cuda.is_available():
+                f.write(f"CUDA Device Count: {torch.cuda.device_count()}\n")
+                f.write(f"Current CUDA Device: {torch.cuda.current_device()}\n")
+            f.write("\n")
+            
+            f.write("="*80 + "\n")
+            f.write("END OF METADATA\n")
+            f.write("="*80 + "\n")
+        
+        self.logger.info(f"Experiment metadata saved to: {metadata_file}")
+        return metadata_file
+    
     def _generate_network_serial_id(self) -> str:
         """Generate a unique serial ID for the network to link training and testing data."""
         import uuid
@@ -397,6 +521,11 @@ class GameTrainer:
         if save_dir and not self.detailed_logging_enabled:
             detailed_log_dir = os.path.join(save_dir, 'detailed_training_logs')
             self.enable_detailed_logging(detailed_log_dir)
+        
+        # Save experiment metadata if save_dir is provided
+        if save_dir:
+            game_config = [{'name': game_name, 'kwargs': game_kwargs or {}, 'weight': 1.0}]
+            self.save_experiment_metadata(save_dir, opponents, game_config)
         
         # Create game instance
         game_kwargs = game_kwargs or {}
@@ -483,6 +612,10 @@ class GameTrainer:
         if save_dir and not self.detailed_logging_enabled:
             detailed_log_dir = os.path.join(save_dir, 'detailed_training_logs')
             self.enable_detailed_logging(detailed_log_dir, save_frequency=25)  # More frequent saves for multi-game
+        
+        # Save experiment metadata if save_dir is provided
+        if save_dir:
+            self.save_experiment_metadata(save_dir, opponents, game_configs)
         
         # Initialize games
         games = {}
@@ -1323,7 +1456,7 @@ class GameTrainer:
         for game_step in range(self.config.num_games_per_partner):
             # Get current state
             state_vector = game.get_state_vector()
-            state_tensor = torch.from_numpy(state_vector).float().unsqueeze(0).to(self.device)
+            state_tensor = torch.from_numpy(state_vector).float().unsqueeze(0).unsqueeze(0).to(self.device)
             
             # Get network outputs
             policy_logits, opponent_policy_logits, value_estimate, new_hidden = self.network.forward(state_tensor, hidden)
@@ -1389,7 +1522,7 @@ class GameTrainer:
                 'cumulative_reward': session_stats['cumulative_reward'],
                 'average_reward': session_stats['cumulative_reward'] / session_stats['total_games'],
                 'cooperation_rate': session_stats['cooperation_count'] / session_stats['total_games'],
-                'opponent_cooperation_rate': sum(1 for _, opp_action in game.history if opp_action == Action.COOPERATE) / len(game.history) if game.history else 0.0,
+                'opponent_cooperation_rate': sum(1 for round_data in game.history if round_data['opponent_action'] == Action.COOPERATE) / len(game.history) if game.history else 0.0,
                 'num_games': session_stats['total_games'],
                 'opponent_type': opponent.get_type_parameter(),
                 'opponent_name': opponent.get_strategy_name()

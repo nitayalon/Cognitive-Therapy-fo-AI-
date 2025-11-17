@@ -17,7 +17,7 @@ import json
 import os
 import logging
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import numpy as np
 import torch
 
@@ -27,7 +27,8 @@ from cognitive_therapy_ai import (
     OpponentFactory, 
     GameLSTM, 
     GameTrainer,
-    MixedMotiveGame
+    MixedMotiveGame,
+    Opponent
 )
 from cognitive_therapy_ai.config import (
     NetworkConfig, 
@@ -43,7 +44,7 @@ from cognitive_therapy_ai.utils import (
 
 
 class NumpyJSONEncoder(json.JSONEncoder):
-    """Custom JSON encoder to handle NumPy data types and PyTorch tensors."""
+    """Custom JSON encoder to handle NumPy data types, PyTorch tensors, and Opponent objects."""
     
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -59,6 +60,13 @@ class NumpyJSONEncoder(json.JSONEncoder):
                 return obj.item()
             except (ValueError, TypeError):
                 pass
+        # Handle Opponent objects
+        elif hasattr(obj, 'get_type_parameter') and hasattr(obj, 'get_strategy_name'):
+            return {
+                'strategy_name': obj.get_strategy_name(),
+                'type_parameter': obj.get_type_parameter(),
+                'opponent_id': getattr(obj, 'opponent_id', str(id(obj)))
+            }
         return super().default(obj)
 
 
@@ -84,16 +92,47 @@ def parse_arguments():
     parser.add_argument(
         '--test-game', 
         type=str, 
-        choices=['hawk-dove', 'prisoners-dilemma', 'battle-of-sexes', 'stag-hunt'],
         default='stag-hunt',
-        help='Game to test the trained agent on'
+        help='Game to test the trained agent on (single game name from: hawk-dove, prisoners-dilemma, battle-of-sexes, stag-hunt)'
     )
     
     parser.add_argument(
         '--opponents', 
         type=str, 
         default='0.1,0.3,0.5,0.7,0.9',
-        help='Comma-separated list of opponent defection probabilities'
+        help='Comma-separated list of opponent defection probabilities (used to define range for equally spaced opponents)'
+    )
+    
+    parser.add_argument(
+        '--equally-spaced-opponents',
+        action='store_true',
+        help='Generate equally spaced opponents across the range defined by --opponents'
+    )
+    
+    parser.add_argument(
+        '--num-opponents',
+        type=int,
+        default=11,
+        help='Number of equally spaced opponents to generate (default: 11)'
+    )
+    
+    parser.add_argument(
+        '--include-opponent-boundaries',
+        action='store_true',
+        help='Include exact 0.0 and 1.0 defection probabilities in equally spaced set'
+    )
+    
+    parser.add_argument(
+        '--segmented-experiments',
+        action='store_true',
+        help='Create separate experiments for each adjacent pair of opponent probabilities (e.g., [0.1,0.3,0.9] creates experiments for [0.1,0.3] and [0.3,0.9])'
+    )
+    
+    parser.add_argument(
+        '--opponents-per-segment',
+        type=int,
+        default=5,
+        help='Number of equally spaced opponents per segment in segmented experiments (default: 5)'
     )
     
     parser.add_argument(
@@ -174,7 +213,7 @@ def create_network(network_config: NetworkConfig, game: MixedMotiveGame) -> Game
     return network
 
 
-def run_multi_game_experiment(
+def run_segmented_experiments(
     training_games: List[str],
     test_game: str,
     opponent_probs: List[float],
@@ -182,7 +221,103 @@ def run_multi_game_experiment(
     training_config: TrainingConfig,
     device: torch.device,
     output_dirs: Dict[str, str],
-    use_adaptive_loss: bool = False
+    use_adaptive_loss: bool = False,
+    opponents_per_segment: int = 5
+) -> Dict[str, Any]:
+    """
+    Run separate experiments for each segment of opponent probability ranges.
+    
+    Creates multiple experiments where each experiment covers one segment of the
+    probability range with equally spaced opponents within that segment.
+    
+    Args:
+        training_games: List of game names to train on
+        test_game: Name of the test game
+        opponent_probs: List of opponent defection probabilities defining segment boundaries
+        network_config: Network configuration
+        training_config: Training configuration
+        device: Device for computations
+        output_dirs: Output directories
+        use_adaptive_loss: Whether to use adaptive loss
+        opponents_per_segment: Number of opponents per segment
+        
+    Returns:
+        Dictionary with results from all segment experiments
+    """
+    logger = logging.getLogger(__name__)
+    logger.info(f"Running segmented experiments for {len(opponent_probs)-1} segments")
+    
+    # Create experiment configurations for each segment
+    experiment_configs = OpponentFactory.create_segmented_experiment_configs(
+        opponent_probs,
+        num_opponents_per_segment=opponents_per_segment,
+        include_boundaries=False
+    )
+    
+    logger.info(f"Created {len(experiment_configs)} segment experiments:")
+    for config in experiment_configs:
+        logger.info(f"  - {config['experiment_id']}: {config['description']}")
+    
+    all_results = {}
+    
+    # Run each segment experiment
+    for segment_config in experiment_configs:
+        segment_id = segment_config['experiment_id']
+        segment_opponents = segment_config['opponents']
+        
+        logger.info(f"\n🔬 Running Segment Experiment: {segment_id}")
+        logger.info(f"   Range: {segment_config['segment_range']}")
+        logger.info(f"   Opponents: {segment_config['num_opponents']}")
+        
+        # Create segment-specific output directories
+        segment_output_dirs = {}
+        for key, base_dir in output_dirs.items():
+            segment_output_dirs[key] = os.path.join(base_dir, segment_id)
+            os.makedirs(segment_output_dirs[key], exist_ok=True)
+        
+        # Run the experiment for this segment
+        segment_results = run_multi_game_experiment(
+            training_games=training_games,
+            test_game=test_game,
+            opponents=segment_opponents,  # Use pre-created opponents
+            network_config=network_config,
+            training_config=training_config,
+            device=device,
+            output_dirs=segment_output_dirs,
+            use_adaptive_loss=use_adaptive_loss,
+            segment_info=segment_config
+        )
+        
+        all_results[segment_id] = {
+            'segment_config': segment_config,
+            'results': segment_results
+        }
+        
+        logger.info(f"✅ Completed segment experiment: {segment_id}")
+    
+    logger.info(f"\n🎯 All {len(experiment_configs)} segment experiments completed!")
+    
+    return {
+        'segmented_results': all_results,
+        'total_segments': len(experiment_configs),
+        'segments_info': [config for config in experiment_configs]
+    }
+
+
+def run_multi_game_experiment(
+    training_games: List[str],
+    test_game: str,
+    opponent_probs: Optional[List[float]] = None,
+    opponents: Optional[List[Opponent]] = None,
+    network_config: NetworkConfig = None,
+    training_config: TrainingConfig = None,
+    device: torch.device = None,
+    output_dirs: Dict[str, str] = None,
+    use_adaptive_loss: bool = False,
+    equally_spaced_opponents: bool = False,
+    num_opponents: int = 11,
+    include_opponent_boundaries: bool = False,
+    segment_info: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Run experiment with training on multiple games and testing on a separate game.
@@ -211,8 +346,24 @@ def run_multi_game_experiment(
     # Create network
     network = create_network(network_config, sample_game)
     
-    # Create opponents
-    opponents = OpponentFactory.create_opponent_set(opponent_probs)
+    # Create opponents (if not already provided)
+    if opponents is None:
+        if opponent_probs is None:
+            raise ValueError("Must provide either opponent_probs or opponents")
+            
+        if equally_spaced_opponents:
+            logger.info(f"Generating {num_opponents} equally spaced opponents from range {min(opponent_probs):.3f} to {max(opponent_probs):.3f}")
+            opponents = OpponentFactory.create_equally_spaced_opponents(
+                opponent_probs, 
+                num_opponents=num_opponents,
+                include_boundaries=include_opponent_boundaries
+            )
+            logger.info(f"Created {len(opponents)} equally spaced opponents")
+        else:
+            logger.info(f"Using specified opponent defection probabilities: {opponent_probs}")
+            opponents = OpponentFactory.create_opponent_set(opponent_probs)
+    else:
+        logger.info(f"Using pre-created opponents: {len(opponents)} opponents")
     
     # Create trainer
     trainer = GameTrainer(
@@ -263,8 +414,19 @@ def run_multi_game_experiment(
     test_results = trainer.evaluate(
         game=test_game_instance,
         opponents=opponents,
-        num_sessions=50  # More sessions for thorough testing
+        num_sessions=50,  # More sessions for thorough testing
+        enable_detailed_testing=True,
+        testing_log_dir=os.path.join(output_dirs['logs'], 'detailed_testing_logs')
     )
+    
+    # Extract opponent probabilities from opponents list if opponent_probs is None
+    if opponent_probs is None and opponents is not None:
+        opponent_probabilities = []
+        for opponent in opponents:
+            type_param = opponent.get_type_parameter()
+            if type_param is not None:
+                opponent_probabilities.append(type_param)
+        opponent_probs = opponent_probabilities if opponent_probabilities else None
     
     # Compile complete results
     complete_results = {
@@ -289,7 +451,10 @@ def run_single_game_experiment(
     training_config: TrainingConfig,
     device: torch.device,
     output_dirs: Dict[str, str],
-    use_adaptive_loss: bool = False
+    use_adaptive_loss: bool = False,
+    equally_spaced_opponents: bool = False,
+    num_opponents: int = 11,
+    include_opponent_boundaries: bool = False
 ) -> Dict[str, Any]:
     """
     Run training experiment on a single game.
@@ -316,7 +481,17 @@ def run_single_game_experiment(
     network = create_network(network_config, game)
     
     # Create opponents
-    opponents = OpponentFactory.create_opponent_set(opponent_probs)
+    if equally_spaced_opponents:
+        logger.info(f"Generating {num_opponents} equally spaced opponents from range {min(opponent_probs):.3f} to {max(opponent_probs):.3f}")
+        opponents = OpponentFactory.create_equally_spaced_opponents(
+            opponent_probs, 
+            num_opponents=num_opponents,
+            include_boundaries=include_opponent_boundaries
+        )
+        logger.info(f"Created {len(opponents)} equally spaced opponents")
+    else:
+        logger.info(f"Using specified opponent defection probabilities: {opponent_probs}")
+        opponents = OpponentFactory.create_opponent_set(opponent_probs)
     
     # Create trainer
     trainer = GameTrainer(
@@ -337,8 +512,20 @@ def run_single_game_experiment(
     evaluation_results = trainer.evaluate(
         game=game,
         opponents=opponents,
-        num_sessions=20
+        num_sessions=20,
+        enable_detailed_testing=True,
+        testing_log_dir=os.path.join(output_dirs['logs'], 'detailed_testing_logs')
     )
+    
+    # Extract opponent probabilities from opponents if needed
+    if hasattr(opponents, '__iter__'):
+        extracted_probs = []
+        for opponent in opponents:
+            type_param = opponent.get_type_parameter()
+            if type_param is not None:
+                extracted_probs.append(type_param)
+        if extracted_probs:
+            opponent_probs = extracted_probs
     
     # Compile complete results
     complete_results = {
@@ -715,7 +902,20 @@ def main():
     
     # Parse training games and test game
     training_games = [game.strip() for game in args.training_games.split(',')]
-    test_game = args.test_game
+    test_game = args.test_game.strip()
+    
+    # Validate games
+    valid_games = ['hawk-dove', 'prisoners-dilemma', 'battle-of-sexes', 'stag-hunt']
+    
+    # Validate training games
+    for game in training_games:
+        if game not in valid_games:
+            raise ValueError(f"Invalid training game '{game}'. Must be one of: {', '.join(valid_games)}")
+    
+    # Validate test game
+    if test_game not in valid_games:
+        raise ValueError(f"Invalid test game '{test_game}'. Must be one of: {', '.join(valid_games)}")
+    
     logger.info(f"Training games: {training_games}")
     logger.info(f"Test game: {test_game}")
     
@@ -748,21 +948,95 @@ def main():
     with open(config_file, 'w') as f:
         json.dump(config_data, f, indent=2, cls=NumpyJSONEncoder)
     
-    # Run multi-game training and testing experiment
+    # Run experiments (segmented or regular)
     try:
-        result = run_multi_game_experiment(
-            training_games=training_games,
-            test_game=test_game,
-            opponent_probs=opponent_probs,
-            network_config=network_config,
-            training_config=training_config,
-            device=device,
-            output_dirs=output_dirs,
-            use_adaptive_loss=args.adaptive_loss
-        )
+        if args.segmented_experiments:
+            logger.info("Running segmented experiments")
+            result = run_segmented_experiments(
+                training_games=training_games,
+                test_game=test_game,
+                opponent_probs=opponent_probs,
+                network_config=network_config,
+                training_config=training_config,
+                device=device,
+                output_dirs=output_dirs,
+                use_adaptive_loss=args.adaptive_loss,
+                opponents_per_segment=args.opponents_per_segment
+            )
+        else:
+            logger.info("Running single unified experiment")
+            result = run_multi_game_experiment(
+                training_games=training_games,
+                test_game=test_game,
+                opponent_probs=opponent_probs,
+                network_config=network_config,
+                training_config=training_config,
+                device=device,
+                output_dirs=output_dirs,
+                use_adaptive_loss=args.adaptive_loss,
+                equally_spaced_opponents=args.equally_spaced_opponents,
+                num_opponents=args.num_opponents,
+                include_opponent_boundaries=args.include_opponent_boundaries
+            )
         
         # Create final report
-        create_multi_game_report(result, output_dirs)
+        if args.segmented_experiments:
+            # For segmented experiments, create reports for each segment
+            logger.info("Creating segmented experiment reports...")
+            
+            # Create a combined report for all segments
+            combined_report = {
+                'experiment_summary': {
+                    'experiment_type': 'segmented_experiments',
+                    'training_games': training_games,
+                    'test_game': test_game,
+                    'total_segments': result['total_segments'],
+                    'timestamp': datetime.now().isoformat(),
+                },
+                'segment_reports': {}
+            }
+            
+            # Create individual reports for each segment
+            for segment_id, segment_data in result['segmented_results'].items():
+                segment_config = segment_data['segment_config']
+                segment_results = segment_data['results']
+                
+                # Create individual segment report
+                create_multi_game_report(segment_results, output_dirs)
+                
+                # Extract opponent probabilities for serialization
+                opponent_probs_for_segment = []
+                for opponent in segment_config['opponents']:
+                    type_param = opponent.get_type_parameter()
+                    if type_param is not None:
+                        opponent_probs_for_segment.append(type_param)
+                
+                # Add to combined report (exclude raw opponents to avoid serialization issues)
+                combined_report['segment_reports'][segment_id] = {
+                    'segment_config': {
+                        'experiment_id': segment_config['experiment_id'],
+                        'segment_range': segment_config['segment_range'],
+                        'num_opponents': segment_config['num_opponents'],
+                        'description': segment_config['description'],
+                        'opponent_probabilities': opponent_probs_for_segment
+                    },
+                    'summary': {
+                        'training_games': segment_results.get('training_games', training_games),
+                        'test_game': segment_results.get('test_game', test_game),
+                        'opponent_count': len(segment_config['opponents']),
+                        'segment_range': segment_config['segment_range']
+                    }
+                }
+            
+            # Save combined segmented report
+            combined_report_file = os.path.join(output_dirs['results'], 'segmented_experiments_report.json')
+            with open(combined_report_file, 'w') as f:
+                json.dump(combined_report, f, indent=2, cls=NumpyJSONEncoder)
+            
+            logger.info(f"Segmented experiments report saved to {combined_report_file}")
+        else:
+            # For single experiments, use the regular report
+            create_multi_game_report(result, output_dirs)
         
     except Exception as e:
         logger.error(f"Error in multi-game experiment: {str(e)}")

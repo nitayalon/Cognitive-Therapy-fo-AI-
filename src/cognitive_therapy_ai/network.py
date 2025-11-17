@@ -127,12 +127,45 @@ class GameLSTM(nn.Module):
         Forward pass of the network.
         
         Args:
-            x: Input tensor of shape (batch_size, sequence_length, input_size)
+            x: Input tensor of shape (batch_size, sequence_length, input_size) or (sequence_length, input_size)
             hidden: Optional hidden state tuple (h_0, c_0)
             
         Returns:
             Tuple of (policy_logits, opponent_policy_logits, value_estimate, new_hidden)
         """
+        # Handle dimension mismatch between input and hidden state
+        # PyTorch LSTM expects consistent batching
+        original_input_dims = x.dim()
+        
+        # Ensure input has batch dimension for LSTM
+        if x.dim() == 2:  # (seq_len, input_size) - unbatched
+            x = x.unsqueeze(0)  # Add batch dimension -> (1, seq_len, input_size)
+            batch_size = 1
+        elif x.dim() == 3:  # (batch_size, seq_len, input_size) - batched
+            batch_size = x.size(0)
+        else:
+            raise ValueError(f"Input tensor must be 2D or 3D, got {x.dim()}D tensor with shape {x.shape}")
+        
+        # Ensure hidden state matches the input batching
+        if hidden is not None:
+            h_0, c_0 = hidden
+            # If hidden state doesn't match batch size, adjust it
+            if h_0.size(1) != batch_size:
+                if batch_size == 1 and h_0.dim() == 3:
+                    # If we added batch dimension to input, hidden state should also have batch=1
+                    if h_0.size(1) != 1:
+                        # Create new hidden state with correct batch size
+                        device = h_0.device
+                        h_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
+                        c_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
+                        hidden = (h_0, c_0)
+                elif h_0.size(1) != batch_size:
+                    # Batch size mismatch - reinitialize hidden state
+                    device = h_0.device
+                    h_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
+                    c_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
+                    hidden = (h_0, c_0)
+        
         # LSTM forward pass
         lstm_out, new_hidden = self.lstm(x, hidden)
         
@@ -146,6 +179,12 @@ class GameLSTM(nn.Module):
         policy_logits = self.policy_head(last_output)
         opponent_policy_logits = self.opponent_policy_head(last_output)
         value_estimate = self.value_head(last_output)
+        
+        # If original input was unbatched (2D), squeeze the batch dimension from outputs
+        if original_input_dims == 2:
+            policy_logits = policy_logits.squeeze(0)
+            opponent_policy_logits = opponent_policy_logits.squeeze(0)
+            value_estimate = value_estimate.squeeze(0)
         
         return policy_logits, opponent_policy_logits, value_estimate, new_hidden
     

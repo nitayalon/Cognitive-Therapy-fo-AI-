@@ -53,7 +53,6 @@ class TestingMonitor:
         
         # Initialize CSV file with headers
         self.csv_path = os.path.join(output_dir, 'detailed_testing_log.csv')
-        self.excel_path = os.path.join(output_dir, 'detailed_testing_log.xlsx')
         
         # Define column headers for testing
         self.columns = [
@@ -271,6 +270,23 @@ class TestingMonitor:
         else:
             return 0.0
     
+    def _json_serialize_default(self, obj):
+        """Custom JSON serialization for NumPy and PyTorch types."""
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif torch.is_tensor(obj):
+            return obj.detach().cpu().numpy().tolist()
+        elif hasattr(obj, 'item'):  # Handle single-element tensors
+            try:
+                return obj.item()
+            except (ValueError, TypeError):
+                pass
+        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+    
     def save_to_disk(self):
         """Save the current testing log to disk."""
         if not self.testing_log:
@@ -285,9 +301,6 @@ class TestingMonitor:
                 df.tail(self.save_frequency).to_csv(self.csv_path, mode='a', header=False, index=False)
             else:
                 df.to_csv(self.csv_path, index=False)
-            
-            # Save as Excel (full file each time for better formatting)
-            df.to_excel(self.excel_path, index=False, sheet_name='Testing_Log')
             
             self.logger.debug(f"Saved {len(df)} testing log entries to disk")
             
@@ -352,7 +365,7 @@ class TestingMonitor:
         summary_file = os.path.join(self.output_dir, f'session_{self.current_test_session}_summary.json')
         import json
         with open(summary_file, 'w') as f:
-            json.dump(session_summary, f, indent=2)
+            json.dump(session_summary, f, indent=2, default=self._json_serialize_default)
         
         self.logger.info(f"Finalized test session {self.current_test_session}: "
                         f"{len(session_data)} steps, avg_reward={avg_reward:.4f}")
@@ -391,7 +404,6 @@ class TestingMonitor:
             print(f"📊 Network ID: {self.network_serial_id}")
             print(f"📈 Total test steps logged: {len(self.testing_log)}")
             print(f"📁 Detailed test logs: {self.csv_path}")
-            print(f"📋 Excel format: {self.excel_path}")
     
     def get_network_serial_id(self) -> str:
         """Get the network's serial ID for linking with training data."""
@@ -419,7 +431,7 @@ class TestingMonitor:
         
         import json
         with open(linkage_file, 'w') as f:
-            json.dump(linkage_data, f, indent=2)
+            json.dump(linkage_data, f, indent=2, default=self._json_serialize_default)
         
         self.logger.info(f"Created training-test linkage file: {linkage_file}")
         return linkage_file

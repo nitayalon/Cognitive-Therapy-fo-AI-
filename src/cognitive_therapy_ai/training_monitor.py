@@ -55,7 +55,6 @@ class TrainingMonitor:
         
         # Initialize CSV file with headers
         self.csv_path = os.path.join(output_dir, 'detailed_training_log.csv')
-        self.excel_path = os.path.join(output_dir, 'detailed_training_log.xlsx')
         
         # Define column headers
         self.columns = [
@@ -250,9 +249,6 @@ class TrainingMonitor:
             else:
                 df.to_csv(self.csv_path, index=False)
             
-            # Save as Excel (full file each time for better formatting)
-            df.to_excel(self.excel_path, index=False, sheet_name='Training_Log')
-            
             self.logger.debug(f"Saved {len(df)} training log entries to disk")
             
         except Exception as e:
@@ -313,7 +309,6 @@ class TrainingMonitor:
             print(f"\n🎯 TRAINING MONITOR FINALIZED")
             print(f"📊 Total steps logged: {len(self.training_log)}")
             print(f"📁 Detailed logs: {self.csv_path}")
-            print(f"📈 Excel format: {self.excel_path}")
 
 
 class BatchedTrainingMonitor(TrainingMonitor):

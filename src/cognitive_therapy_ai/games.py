@@ -98,6 +98,10 @@ class MixedMotiveGame(ABC):
         """Reset the game state."""
         self.history = []
     
+    def get_name(self) -> str:
+        """Get the name of the game."""
+        return self.name
+    
     def get_cumulative_payoff(self) -> float:
         """Get cumulative payoff for the player."""
         return sum(round_data['player_payoff'] for round_data in self.history)

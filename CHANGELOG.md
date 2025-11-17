@@ -7,6 +7,71 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Segmented Experiment System (2025-11-14)**: Multiple experiment generation for different probability ranges
+  - **Segmented Experiment Creation**:
+    - New `OpponentFactory.create_segmented_experiment_configs()` method for creating separate experiments per probability segment
+    - Automatically generates separate experiments for each adjacent pair of input probabilities
+    - Example: Input `[0.1, 0.3, 0.9]` creates two experiments: `[0.1, 0.3]` and `[0.3, 0.9]`
+    - Each segment gets equally spaced opponents within its range for comprehensive coverage
+    - Configurable opponents per segment (default: 5) for density control
+    - Separate output directories and metadata files for each segment experiment
+    - Files: Enhanced `src/cognitive_therapy_ai/opponent.py`
+  
+  - **Enhanced Experiment Orchestration**:
+    - New `run_segmented_experiments()` function for managing multiple segment experiments
+    - Automatic creation of segment-specific output directories and logging
+    - Individual experiment metadata documentation for each segment
+    - Consolidated results reporting across all segments
+    - Complete isolation between segment experiments for independent analysis
+    - Files: Enhanced `main_experiment.py`
+  
+  - **Extended Command-Line Interface**:
+    - New `--segmented-experiments` flag to enable segment-based experiment generation
+    - New `--opponents-per-segment` parameter to control opponent density per segment (default: 5)
+    - Maintains backward compatibility with existing `--equally-spaced-opponents` for single unified experiments
+    - Clear differentiation between unified and segmented experiment modes
+    - Files: Enhanced `main_experiment.py`
+  
+  - **Enhanced Testing and Validation**:
+    - Extended `test_equally_spaced_opponents.py` with segmented experiment testing
+    - Comprehensive validation of segment creation, opponent distribution, and experiment configuration
+    - Example test cases demonstrating real-world usage patterns
+    - VS Code launch configuration "Python: Segmented Experiments Demo" for interactive testing
+
+- **Equally Spaced Opponent Generation System (2025-11-14)**: Comprehensive opponent distribution system
+  - **Equally Spaced Opponent Creation**:
+    - New `OpponentFactory.create_equally_spaced_opponents()` method for generating uniform opponent distributions
+    - Automatically generates equally spaced opponents across min/max range from input probabilities
+    - Configurable opponent density (default: 11 opponents) for comprehensive coverage
+    - Optional boundary inclusion (0.0 and 1.0 defection probabilities) for complete range testing
+    - Ensures training and testing use identical opponent sets for consistent evaluation
+    - Handles edge cases (single probability, identical min/max) gracefully
+    - Files: Enhanced `src/cognitive_therapy_ai/opponent.py`
+  
+  - **Experiment Metadata Documentation**:
+    - New `GameTrainer.save_experiment_metadata()` method for comprehensive experiment documentation
+    - Automatic generation of detailed metadata files with experiment parameters
+    - Documents opponent configuration (range, spacing, individual probabilities)
+    - Records network architecture, training configuration, and loss function settings
+    - Includes device information and system configuration details
+    - Timestamp-based filename with network serial ID for tracking
+    - Text file format for human readability and analysis
+    - Files: Enhanced `src/cognitive_therapy_ai/trainer.py`
+  
+  - **Enhanced Command-Line Interface**:
+    - New `--equally-spaced-opponents` flag to enable uniform opponent distribution
+    - New `--num-opponents` parameter to control opponent density (default: 11)
+    - New `--include-opponent-boundaries` flag to include exact 0.0/1.0 probabilities
+    - Backward compatibility with existing `--opponents` parameter for range definition
+    - Updated experiment functions to support new opponent generation modes
+    - Files: Enhanced `main_experiment.py`
+  
+  - **Testing and Integration**:
+    - New `test_equally_spaced_opponents.py` for validating opponent generation
+    - Integration with both single-game and multi-game experiment workflows
+    - Automatic metadata saving in all training methods when save directories provided
+    - Complete parameter passing through experiment function chains
+
 - **Complete Training & Testing Documentation System (2025-11-13)**: Comprehensive monitoring pipeline
   - **Training Phase Monitoring**: 
     - New `TrainingMonitor` and `BatchedTrainingMonitor` classes for detailed logging

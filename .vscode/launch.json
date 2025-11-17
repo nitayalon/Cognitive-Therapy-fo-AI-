@@ -44,11 +44,11 @@
             },
             "python": "${workspaceFolder}/.venv/Scripts/python.exe",
             "args": [
-                "--training-games", "hawk-dove,battle-of-sexes,prisoners-dilemma",
+                "--training-games", "hawk-dove, prisoners-dilemma",
                 "--test-game", "stag-hunt",
-                "--opponents", "0.8,0.7",
-                "--max-epochs", "1000",
-                "--num-games", "50",
+                "--opponents", "0.3,0.6,0.9",
+                "--max-epochs", "20000",
+                "--num-games", "30",
                 "--verbose"
             ]
         },
@@ -65,7 +65,7 @@
             "python": "${workspaceFolder}/.venv/Scripts/python.exe",
             "args": [
                 "--training-games", "hawk-dove,prisoners-dilemma",
-                "--test-game", "stag-hunt, battle-of-sexes",
+                "--test-game", "battle-of-sexes",
                 "--opponents", "0.1,0.3,0.5,0.7,0.9",
                 "--max-epochs", "50000",
                 "--num-games", "100",
@@ -286,6 +286,63 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/complete_monitoring_demo.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+        },
+        {
+            "name": "Python: Equally Spaced Opponents Demo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "prisoners-dilemma",
+                "--test-game", "hawk-dove",
+                "--opponents", "0.2,0.8",
+                "--equally-spaced-opponents",
+                "--num-opponents", "15",
+                "--include-opponent-boundaries",
+                "--max-epochs", "10",
+                "--num-games", "20",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Segmented Experiments Demo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_experiment.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "args": [
+                "--training-games", "prisoners-dilemma",
+                "--test-game", "hawk-dove",
+                "--opponents", "0.1,0.3,0.9",
+                "--segmented-experiments",
+                "--opponents-per-segment", "5",
+                "--max-epochs", "5",
+                "--num-games", "15",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "Python: Test Equally Spaced Opponents",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_equally_spaced_opponents.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {

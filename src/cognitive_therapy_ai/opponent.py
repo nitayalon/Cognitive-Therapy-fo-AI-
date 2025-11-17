@@ -6,7 +6,7 @@ probabilistic opponent used in the cognitive therapy experiments.
 """
 
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from abc import ABC, abstractmethod
 import random
 
@@ -269,6 +269,125 @@ class OpponentFactory:
             opponent_id = f"prob_opponent_{i}_p{p:.2f}"
             opponents.append(OpponentFactory.create_probabilistic_opponent(p, opponent_id))
         return opponents
+    
+    @staticmethod
+    def create_equally_spaced_opponents(
+        defection_probabilities: List[float], 
+        num_opponents: int = 11,
+        include_boundaries: bool = True
+    ) -> List[Opponent]:
+        """
+        Create equally spaced opponents across a defection probability range.
+        
+        If specific probabilities are given, uses the min and max to create equally
+        spaced opponents across that range. This ensures training and testing use
+        the same comprehensive opponent set rather than just the specified points.
+        
+        Args:
+            defection_probabilities: List of defection probabilities to define range
+            num_opponents: Number of equally spaced opponents to generate (default: 11)
+            include_boundaries: Whether to include exact 0.0 and 1.0 probabilities
+            
+        Returns:
+            List of equally spaced opponent instances
+            
+        Example:
+            Input: [0.1, 0.3, 0.9] with num_opponents=11 
+            Output: Opponents with defection probs [0.1, 0.18, 0.26, 0.34, 0.42, 0.5, 0.58, 0.66, 0.74, 0.82, 0.9]
+        """
+        if not defection_probabilities:
+            raise ValueError("Must provide at least one defection probability")
+        
+        # Find the range from provided probabilities
+        min_prob = min(defection_probabilities)
+        max_prob = max(defection_probabilities)
+        
+        # Handle edge case where min and max are the same
+        if min_prob == max_prob:
+            return [OpponentFactory.create_probabilistic_opponent(min_prob, f"prob_opponent_fixed_p{min_prob:.3f}")]
+        
+        # Generate equally spaced probabilities
+        equally_spaced_probs = np.linspace(min_prob, max_prob, num_opponents)
+        
+        # Optionally include exact boundaries if requested and not already included
+        if include_boundaries:
+            prob_set = set(equally_spaced_probs)
+            if 0.0 not in prob_set and min_prob > 0.0:
+                equally_spaced_probs = np.concatenate([[0.0], equally_spaced_probs])
+            if 1.0 not in prob_set and max_prob < 1.0:
+                equally_spaced_probs = np.concatenate([equally_spaced_probs, [1.0]])
+        
+        # Create opponent instances
+        opponents = []
+        for i, p in enumerate(equally_spaced_probs):
+            # Ensure probability is within valid bounds
+            p = max(0.0, min(1.0, float(p)))
+            opponent_id = f"equally_spaced_{i}_p{p:.3f}"
+            opponents.append(OpponentFactory.create_probabilistic_opponent(p, opponent_id))
+        
+        return opponents
+    
+    @staticmethod
+    def create_segmented_experiment_configs(
+        defection_probabilities: List[float],
+        num_opponents_per_segment: int = 11,
+        include_boundaries: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Create separate experiment configurations for each adjacent pair of defection probabilities.
+        
+        This creates multiple experiments where each experiment covers one segment of the
+        probability range with equally spaced opponents within that segment.
+        
+        Args:
+            defection_probabilities: Sorted list of defection probabilities defining segment boundaries
+            num_opponents_per_segment: Number of equally spaced opponents per segment
+            include_boundaries: Whether to include exact 0.0 and 1.0 probabilities
+            
+        Returns:
+            List of experiment configurations, each containing opponents for one segment
+            
+        Example:
+            Input: [0.1, 0.3, 0.9] with num_opponents_per_segment=5
+            Output: 
+                - Experiment 1: [0.1, 0.15, 0.2, 0.25, 0.3] (segment 0.1-0.3)
+                - Experiment 2: [0.3, 0.45, 0.6, 0.75, 0.9] (segment 0.3-0.9)
+        """
+        if len(defection_probabilities) < 2:
+            raise ValueError("Must provide at least two defection probabilities to create segments")
+        
+        # Sort probabilities to ensure proper segmentation
+        sorted_probs = sorted(defection_probabilities)
+        
+        experiment_configs = []
+        
+        # Create experiment for each adjacent pair
+        for i in range(len(sorted_probs) - 1):
+            start_prob = sorted_probs[i]
+            end_prob = sorted_probs[i + 1]
+            
+            # Generate equally spaced opponents for this segment
+            segment_probs = np.linspace(start_prob, end_prob, num_opponents_per_segment)
+            
+            # Create opponents for this segment
+            segment_opponents = []
+            for j, p in enumerate(segment_probs):
+                p = max(0.0, min(1.0, float(p)))
+                opponent_id = f"segment_{i}_opponent_{j}_p{p:.3f}"
+                segment_opponents.append(OpponentFactory.create_probabilistic_opponent(p, opponent_id))
+            
+            # Create experiment configuration
+            experiment_config = {
+                'experiment_id': f"segment_{i}_{start_prob:.2f}_to_{end_prob:.2f}",
+                'segment_range': [start_prob, end_prob],
+                'opponents': segment_opponents,
+                'num_opponents': len(segment_opponents),
+                'description': f"Experiment for defection probability range [{start_prob:.3f}, {end_prob:.3f}]"
+            }
+            
+            experiment_configs.append(experiment_config)
+        
+        return experiment_configs
     
     @staticmethod
     def create_standard_opponents() -> List[Opponent]:
