@@ -208,3 +208,9 @@ __marimo__/
 
 # Experiment results
 experiments/
+
+# SLURM batch scripts and logs
+*.sh
+slurm_logs/
+slurm-*.out
+slurm-*.err
