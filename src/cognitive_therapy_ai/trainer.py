@@ -280,7 +280,7 @@ class GameTrainer:
         # Initialize loss function - use ToM-RL losses (current framework)
         if use_adaptive_loss:
             self.loss_fn = AdaptiveToMRLLoss(
-                alpha=self.config.action_prediction_loss_weight,
+                initial_alpha=self.config.action_prediction_loss_weight,
                 gamma=0.99,
                 use_gae=True
             )
