@@ -183,6 +183,13 @@ def parse_arguments():
         help='Enable verbose logging'
     )
     
+    parser.add_argument(
+        '--experiment-name',
+        type=str,
+        default=None,
+        help='Custom experiment name (overrides timestamp-based naming)'
+    )
+    
     return parser.parse_args()
 
 
@@ -888,8 +895,11 @@ def main():
     device = setup_device(args.device)
     
     # Create experiment name and output directories
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    experiment_name = f"mixed_motive_experiment_{timestamp}"
+    if args.experiment_name:
+        experiment_name = args.experiment_name
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        experiment_name = f"mixed_motive_experiment_{timestamp}"
     output_dirs = create_output_dirs(args.output_dir, experiment_name)
     
     # Setup logging
