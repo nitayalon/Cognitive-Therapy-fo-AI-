@@ -1281,23 +1281,69 @@ class GameTrainer:
                 self.metrics_tracker.add_metric(key, value, epoch)
     
     def _check_convergence(self) -> bool:
-        """Check if training has converged."""
-        # ENABLED: Early termination criteria with patience-based stopping
-        # Track loss improvement and stop if no improvement for 'patience' epochs
-        current_loss = self.loss_analyzer.loss_history['total']
-        if current_loss:
-            latest_loss = current_loss[-1]
-            if latest_loss < self.best_loss - self.config.convergence_threshold:
-                self.best_loss = latest_loss
-                self.patience_counter = 0
-            else:
-                self.patience_counter += 1
+        """
+        Check if training has converged.
         
-        # Early stopping: stop if no improvement for 'patience' epochs
-        if self.patience_counter >= self.config.patience:
-            self.logger.info(f"Early stopping triggered: no improvement for {self.config.patience} epochs")
-            self.logger.info(f"Best loss: {self.best_loss:.6f}, Current loss: {latest_loss:.6f}")
+        Early stopping criteria:
+        1. Must train for at least 1000 epochs (minimum exploration)
+        2. Both RL loss AND opponent prediction loss must be stagnant
+        3. Stagnation = no improvement by threshold for 'patience' consecutive epochs
+        """
+        # Minimum epochs requirement: prevent premature stopping
+        MIN_EPOCHS = 1000
+        if self.current_epoch < MIN_EPOCHS:
+            return False  # Continue training - haven't reached minimum epochs
+        
+        # Check if we have loss history for all components
+        rl_loss_history = self.loss_analyzer.loss_history.get('rl', [])
+        opp_loss_history = self.loss_analyzer.loss_history.get('opponent_policy', [])
+        
+        if not rl_loss_history or not opp_loss_history:
+            return False  # Continue if we don't have full history
+        
+        # Track best losses for each component separately
+        if not hasattr(self, 'best_rl_loss'):
+            self.best_rl_loss = float('inf')
+            self.rl_patience_counter = 0
+            self.best_opp_loss = float('inf')
+            self.opp_patience_counter = 0
+        
+        latest_rl_loss = rl_loss_history[-1]
+        latest_opp_loss = opp_loss_history[-1]
+        
+        # Check RL loss improvement
+        if latest_rl_loss < self.best_rl_loss - self.config.convergence_threshold:
+            self.best_rl_loss = latest_rl_loss
+            self.rl_patience_counter = 0
+        else:
+            self.rl_patience_counter += 1
+        
+        # Check opponent prediction loss improvement
+        if latest_opp_loss < self.best_opp_loss - self.config.convergence_threshold:
+            self.best_opp_loss = latest_opp_loss
+            self.opp_patience_counter = 0
+        else:
+            self.opp_patience_counter += 1
+        
+        # Early stopping: BOTH losses must be stagnant for 'patience' epochs
+        rl_stagnant = self.rl_patience_counter >= self.config.patience
+        opp_stagnant = self.opp_patience_counter >= self.config.patience
+        
+        if rl_stagnant and opp_stagnant:
+            self.logger.info(f"Early stopping triggered at epoch {self.current_epoch}:")
+            self.logger.info(f"  - Minimum epochs met: {self.current_epoch} >= {MIN_EPOCHS}")
+            self.logger.info(f"  - RL loss stagnant for {self.rl_patience_counter} epochs")
+            self.logger.info(f"  - Opponent loss stagnant for {self.opp_patience_counter} epochs")
+            self.logger.info(f"  - Best RL loss: {self.best_rl_loss:.6f}, Current: {latest_rl_loss:.6f}")
+            self.logger.info(f"  - Best Opp loss: {self.best_opp_loss:.6f}, Current: {latest_opp_loss:.6f}")
             return True
+        
+        # Log partial stagnation (for debugging)
+        if self.current_epoch % 100 == 0 and (rl_stagnant or opp_stagnant):
+            if rl_stagnant and not opp_stagnant:
+                self.logger.debug(f"Epoch {self.current_epoch}: RL loss stagnant ({self.rl_patience_counter} epochs), but opponent loss still improving")
+            elif opp_stagnant and not rl_stagnant:
+                self.logger.debug(f"Epoch {self.current_epoch}: Opponent loss stagnant ({self.opp_patience_counter} epochs), but RL loss still improving")
         
         return False  # Continue training
     
