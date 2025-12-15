@@ -31,9 +31,9 @@ class TrainingConfig:
     num_games_per_partner: int = 100  # T parameter
     learning_rate: float = 0.001
     batch_size: int = 32
-    max_epochs: int = 1000
-    convergence_threshold: float = 1e-6
-    patience: int = 50  # Early stopping patience
+    max_epochs: int = 2000
+    convergence_threshold: float = 1e-4
+    patience: int = 100  # Early stopping patience
     
     # Loss function weights
     reward_loss_weight: float = 1.0

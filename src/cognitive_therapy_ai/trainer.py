@@ -1282,26 +1282,24 @@ class GameTrainer:
     
     def _check_convergence(self) -> bool:
         """Check if training has converged."""
-        # DISABLED: Early termination criteria for full epoch training
-        # Still track loss improvement for metrics, but don't terminate early
+        # ENABLED: Early termination criteria with patience-based stopping
+        # Track loss improvement and stop if no improvement for 'patience' epochs
         current_loss = self.loss_analyzer.loss_history['total']
         if current_loss:
             latest_loss = current_loss[-1]
-            if latest_loss < self.best_loss:
+            if latest_loss < self.best_loss - self.config.convergence_threshold:
                 self.best_loss = latest_loss
                 self.patience_counter = 0
             else:
                 self.patience_counter += 1
         
-        # DISABLED: All early termination conditions
-        # Training will run for the full number of epochs (config.max_epochs)
+        # Early stopping: stop if no improvement for 'patience' epochs
+        if self.patience_counter >= self.config.patience:
+            self.logger.info(f"Early stopping triggered: no improvement for {self.config.patience} epochs")
+            self.logger.info(f"Best loss: {self.best_loss:.6f}, Current loss: {latest_loss:.6f}")
+            return True
         
-        # Original convergence checks (commented out):
-        # - Patience-based early stopping
-        # - Loss variance convergence 
-        # - LossAnalyzer convergence detection
-        
-        return False  # Never terminate early - always train full epochs
+        return False  # Continue training
     
     def _compile_final_metrics(self) -> Dict[str, Any]:
         """Compile final training metrics."""
