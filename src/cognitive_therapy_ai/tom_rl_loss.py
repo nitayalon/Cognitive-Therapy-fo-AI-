@@ -547,7 +547,10 @@ class LossAnalyzer:
         self.loss_history['total'].append(loss_dict['total_loss'].item())
         self.loss_history['rl'].append(loss_dict['rl_loss'].item())
         self.loss_history['opponent_policy'].append(loss_dict['opponent_policy_loss'].item())
-        self.loss_history['alpha_values'].append(loss_dict['alpha'])
+        alpha_value = loss_dict.get('alpha', 1.0)
+        if torch.is_tensor(alpha_value):
+            alpha_value = alpha_value.item() if alpha_value.numel() == 1 else alpha_value.mean().item()
+        self.loss_history['alpha_values'].append(alpha_value)
         self.loss_history['epoch'].append(epoch)
         
         # Record normalized losses if available

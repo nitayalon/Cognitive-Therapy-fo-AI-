@@ -552,6 +552,17 @@ class GameTrainer:
             if self._check_convergence():
                 self.logger.info(f"Training converged at epoch {epoch}")
                 break
+
+            # Progress logging
+            if epoch == 0 or (epoch + 1) % 500 == 0 or epoch == self.config.max_epochs - 1:
+                total_loss = epoch_results.get('total_loss', float('nan'))
+                rl_loss = epoch_results.get('rl_loss', float('nan'))
+                opponent_loss = epoch_results.get('opponent_policy_loss', float('nan'))
+                self.logger.info(
+                    f"Epoch {epoch + 1}/{self.config.max_epochs} | "
+                    f"total_loss={total_loss:.6f} | rl_loss={rl_loss:.6f} | "
+                    f"opponent_loss={opponent_loss:.6f}"
+                )
             
             # Save checkpoint
             if save_dir and epoch % 50 == 0:
@@ -1401,6 +1412,16 @@ class GameTrainer:
                 'use_gae': self.loss_fn.use_gae
             }
         }
+
+    def _get_opponent_label(self, opponent: Opponent) -> str:
+        """Generate a unique label for an opponent in evaluation outputs."""
+        opponent_id = getattr(opponent, 'opponent_id', None)
+        if opponent_id:
+            return opponent_id
+        type_param = opponent.get_type_parameter()
+        if type_param is not None:
+            return f"{opponent.get_strategy_name()}_p{type_param:.3f}"
+        return opponent.get_strategy_name()
     
     def evaluate(
         self,
@@ -1456,7 +1477,8 @@ class GameTrainer:
                         if isinstance(opponent_results[0][key], (int, float)):
                             avg_results[key] = np.mean([r[key] for r in opponent_results])
                     
-                    evaluation_results[opponent.get_strategy_name()] = avg_results
+                    opponent_label = self._get_opponent_label(opponent)
+                    evaluation_results[opponent_label] = avg_results
         
         # Finalize test session if monitoring is enabled
         if self.testing_monitor is not None:
@@ -1633,7 +1655,8 @@ class GameTrainer:
                             if isinstance(opponent_results[0][key], (int, float)):
                                 avg_results[key] = np.mean([r[key] for r in opponent_results])
                         
-                        game_results[opponent.get_strategy_name()] = avg_results
+                        opponent_label = self._get_opponent_label(opponent)
+                        game_results[opponent_label] = avg_results
                 
                 multi_game_results[game_name] = dict(game_results)
         
