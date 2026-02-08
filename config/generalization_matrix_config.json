@@ -1,0 +1,71 @@
+{
+  "experiment_name": "generalization_matrix",
+  "description": "Full generalization matrix: Train on single game+opponent range, test across games and opponent ranges",
+  
+  "games": [
+    "prisoners-dilemma",
+    "hawk-dove", 
+    "stag-hunt",
+    "battle-of-sexes"
+  ],
+  
+  "opponent_ranges": {
+    "low": [0.1, 0.3],
+    "mid_low": [0.3, 0.5],
+    "mid_high": [0.5, 0.7],
+    "high": [0.7, 0.9]
+  },
+  
+  "training_conditions": [
+    {"id": 0,  "game": "prisoners-dilemma", "opponent_range": "low",      "opponents": [0.1, 0.3]},
+    {"id": 1,  "game": "prisoners-dilemma", "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
+    {"id": 2,  "game": "prisoners-dilemma", "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
+    {"id": 3,  "game": "prisoners-dilemma", "opponent_range": "high",     "opponents": [0.7, 0.9]},
+    {"id": 4,  "game": "hawk-dove",         "opponent_range": "low",      "opponents": [0.1, 0.3]},
+    {"id": 5,  "game": "hawk-dove",         "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
+    {"id": 6,  "game": "hawk-dove",         "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
+    {"id": 7,  "game": "hawk-dove",         "opponent_range": "high",     "opponents": [0.7, 0.9]},
+    {"id": 8,  "game": "stag-hunt",         "opponent_range": "low",      "opponents": [0.1, 0.3]},
+    {"id": 9,  "game": "stag-hunt",         "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
+    {"id": 10, "game": "stag-hunt",         "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
+    {"id": 11, "game": "stag-hunt",         "opponent_range": "high",     "opponents": [0.7, 0.9]},
+    {"id": 12, "game": "battle-of-sexes",   "opponent_range": "low",      "opponents": [0.1, 0.3]},
+    {"id": 13, "game": "battle-of-sexes",   "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
+    {"id": 14, "game": "battle-of-sexes",   "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
+    {"id": 15, "game": "battle-of-sexes",   "opponent_range": "high",     "opponents": [0.7, 0.9]}
+  ],
+  
+  "test_conditions": {
+    "same_game_same_opponents": "Baseline in-distribution test",
+    "same_game_new_opponents": "Test generalization to new opponent types within same game",
+    "new_game_same_opponents": "Test generalization to new game with familiar opponents",
+    "new_game_new_opponents": "Test generalization to both new game and new opponents"
+  },
+  
+  "network_config": {
+    "hidden_size": 128,
+    "num_layers": 2,
+    "dropout": 0.1
+  },
+  
+  "training_config": {
+    "num_games_per_partner": 100,
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "max_epochs": 500,
+    "convergence_threshold": 1e-6,
+    "patience": 50
+  },
+  
+  "evaluation_config": {
+    "num_sessions": 20,
+    "enable_detailed_testing": true
+  },
+  
+  "slurm_config": {
+    "total_tasks": 16,
+    "task_id_range": "0-15",
+    "estimated_time_per_task": "2:00:00",
+    "memory_per_task": "8G"
+  }
+}

@@ -8,8 +8,8 @@ This script demonstrates how to use the cognitive therapy AI framework to:
 4. Save trained models for further analysis
 
 Usage:
-    python main_experiment.py --config config/experiment_config.json
-    python main_experiment.py --game prisoners-dilemma --opponents 0.1,0.3,0.5,0.7,0.9
+    python main_experiment.py --experiment-mode basic --train-game prisoners-dilemma --train-opponents 0.1,0.3 --test-game hawk-dove --test-opponents 0.7,0.9
+    python main_experiment.py --experiment-mode multi-game --training-games prisoners-dilemma,hawk-dove --test-game stag-hunt --opponents 0.1,0.3,0.5,0.7,0.9
 """
 
 import argparse
@@ -77,11 +77,40 @@ def parse_arguments():
     )
     
     parser.add_argument(
+        '--experiment-mode',
+        type=str,
+        choices=['basic', 'multi-game', 'segmented', 'generalization-matrix'],
+        default='basic',
+        help='Experiment mode: basic (single game + generalization tests), multi-game, segmented, or generalization-matrix (SLURM array jobs)'
+    )
+    
+    parser.add_argument(
+        '--task-id',
+        type=int,
+        default=None,
+        help='Task ID for generalization-matrix mode (SLURM_ARRAY_TASK_ID). Determines which training condition to run.'
+    )
+    
+    parser.add_argument(
+        '--matrix-config',
+        type=str,
+        default='config/generalization_matrix_config.json',
+        help='Path to generalization matrix configuration file'
+    )
+
+    parser.add_argument(
         '--config', 
         type=str, 
         help='Path to experiment configuration file'
     )
     
+    parser.add_argument(
+        '--train-game',
+        type=str,
+        default='prisoners-dilemma',
+        help='Game to train on in basic experiment mode'
+    )
+
     parser.add_argument(
         '--training-games', 
         type=str, 
@@ -92,8 +121,22 @@ def parse_arguments():
     parser.add_argument(
         '--test-game', 
         type=str, 
-        default='stag-hunt',
+        default='hawk-dove',
         help='Game to test the trained agent on (single game name from: hawk-dove, prisoners-dilemma, battle-of-sexes, stag-hunt)'
+    )
+
+    parser.add_argument(
+        '--train-opponents',
+        type=str,
+        default='0.1,0.3',
+        help='Comma-separated defection probabilities for training opponents (basic mode)'
+    )
+
+    parser.add_argument(
+        '--test-opponents',
+        type=str,
+        default='0.7,0.9',
+        help='Comma-separated defection probabilities for testing opponents (basic mode)'
     )
     
     parser.add_argument(
@@ -553,6 +596,418 @@ def run_single_game_experiment(
     return complete_results
 
 
+def summarize_evaluation_results(evaluation_results: Dict[str, Any]) -> Dict[str, Any]:
+    """Summarize evaluation results across opponents."""
+    rewards = []
+    coop_rates = []
+    for stats in evaluation_results.values():
+        if isinstance(stats, dict):
+            if 'average_reward' in stats:
+                rewards.append(stats['average_reward'])
+            if 'cooperation_rate' in stats:
+                coop_rates.append(stats['cooperation_rate'])
+
+    mean_reward = float(np.mean(rewards)) if rewards else 0.0
+    mean_cooperation_rate = float(np.mean(coop_rates)) if coop_rates else 0.0
+
+    return {
+        'mean_reward': mean_reward,
+        'mean_cooperation_rate': mean_cooperation_rate,
+        'opponent_count': len(evaluation_results)
+    }
+
+
+def compute_generalization_error(
+    baseline_summary: Dict[str, Any],
+    target_summary: Dict[str, Any]
+) -> Dict[str, float]:
+    """Compute generalization error relative to in-distribution baseline."""
+    return {
+        'reward_delta': baseline_summary.get('mean_reward', 0.0) - target_summary.get('mean_reward', 0.0),
+        'cooperation_delta': baseline_summary.get('mean_cooperation_rate', 0.0) - target_summary.get('mean_cooperation_rate', 0.0)
+    }
+
+
+def run_basic_generalization_experiment(
+    train_game: str,
+    train_opponent_probs: List[float],
+    test_game: str,
+    test_opponent_probs: List[float],
+    network_config: NetworkConfig,
+    training_config: TrainingConfig,
+    device: torch.device,
+    output_dirs: Dict[str, str],
+    use_adaptive_loss: bool = False
+) -> Dict[str, Any]:
+    """
+    Run single-game training and three generalization evaluations.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("Starting basic single-game generalization experiment")
+    logger.info(f"Train game: {train_game}")
+    logger.info(f"Test game: {test_game}")
+    logger.info(f"Train opponents: {train_opponent_probs}")
+    logger.info(f"Test opponents: {test_opponent_probs}")
+
+    train_game_instance = GameFactory.create_game(train_game)
+    test_game_instance = GameFactory.create_game(test_game)
+
+    network = create_network(network_config, train_game_instance)
+
+    train_opponents = OpponentFactory.create_opponent_set(train_opponent_probs)
+    test_opponents = OpponentFactory.create_opponent_set(test_opponent_probs)
+
+    trainer = GameTrainer(
+        network=network,
+        training_config=training_config,
+        device=device,
+        use_adaptive_loss=use_adaptive_loss
+    )
+
+    training_results = trainer.train_on_game(
+        game_name=train_game,
+        opponents=train_opponents,
+        save_dir=output_dirs['checkpoints']
+    )
+
+    # Baseline evaluation (in-distribution)
+    in_distribution_results = trainer.evaluate(
+        game=train_game_instance,
+        opponents=train_opponents,
+        num_sessions=20,
+        enable_detailed_testing=True,
+        testing_log_dir=os.path.join(output_dirs['logs'], 'detailed_testing_logs', 'in_distribution')
+    )
+
+    # Condition 1: Same game, different opponents
+    same_game_new_opponents = trainer.evaluate(
+        game=train_game_instance,
+        opponents=test_opponents,
+        num_sessions=20,
+        enable_detailed_testing=True,
+        testing_log_dir=os.path.join(output_dirs['logs'], 'detailed_testing_logs', 'same_game_new_opponents')
+    )
+
+    # Condition 2: Different game, same opponents
+    new_game_same_opponents = trainer.evaluate(
+        game=test_game_instance,
+        opponents=train_opponents,
+        num_sessions=20,
+        enable_detailed_testing=True,
+        testing_log_dir=os.path.join(output_dirs['logs'], 'detailed_testing_logs', 'new_game_same_opponents')
+    )
+
+    # Condition 3: New game, new opponents
+    new_game_new_opponents = trainer.evaluate(
+        game=test_game_instance,
+        opponents=test_opponents,
+        num_sessions=20,
+        enable_detailed_testing=True,
+        testing_log_dir=os.path.join(output_dirs['logs'], 'detailed_testing_logs', 'new_game_new_opponents')
+    )
+
+    summaries = {
+        'in_distribution': summarize_evaluation_results(in_distribution_results),
+        'same_game_new_opponents': summarize_evaluation_results(same_game_new_opponents),
+        'new_game_same_opponents': summarize_evaluation_results(new_game_same_opponents),
+        'new_game_new_opponents': summarize_evaluation_results(new_game_new_opponents)
+    }
+
+    generalization_error = {
+        'same_game_new_opponents': compute_generalization_error(summaries['in_distribution'], summaries['same_game_new_opponents']),
+        'new_game_same_opponents': compute_generalization_error(summaries['in_distribution'], summaries['new_game_same_opponents']),
+        'new_game_new_opponents': compute_generalization_error(summaries['in_distribution'], summaries['new_game_new_opponents'])
+    }
+
+    complete_results = {
+        'train_game': train_game,
+        'test_game': test_game,
+        'train_opponent_probabilities': train_opponent_probs,
+        'test_opponent_probabilities': test_opponent_probs,
+        'network_config': network_config.__dict__,
+        'training_config': training_config.__dict__,
+        'training_results': training_results,
+        'evaluation_results': {
+            'in_distribution': in_distribution_results,
+            'same_game_new_opponents': same_game_new_opponents,
+            'new_game_same_opponents': new_game_same_opponents,
+            'new_game_new_opponents': new_game_new_opponents
+        },
+        'evaluation_summaries': summaries,
+        'generalization_error': generalization_error,
+        'network_summary': trainer.network_manager.get_network_summary(),
+        'device': str(device)
+    }
+
+    results_file = os.path.join(output_dirs['results'], 'basic_generalization_results.pkl')
+    save_results(complete_results, results_file)
+
+    report_file = os.path.join(output_dirs['results'], 'basic_generalization_report.json')
+    with open(report_file, 'w') as f:
+        json.dump({
+            'train_game': train_game,
+            'test_game': test_game,
+            'train_opponent_probabilities': train_opponent_probs,
+            'test_opponent_probabilities': test_opponent_probs,
+            'evaluation_summaries': summaries,
+            'generalization_error': generalization_error
+        }, f, indent=2, cls=NumpyJSONEncoder)
+
+    logger.info(f"Basic generalization report saved to {report_file}")
+    return complete_results
+
+
+def run_generalization_matrix_experiment(
+    task_id: int,
+    matrix_config_path: str,
+    network_config: NetworkConfig,
+    training_config: TrainingConfig,
+    device: torch.device,
+    output_dirs: Dict[str, str],
+    use_adaptive_loss: bool = False
+) -> Dict[str, Any]:
+    """
+    Run a single task from the generalization matrix experiment.
+    
+    This function is designed for SLURM array job execution where each task_id
+    corresponds to a specific training condition (game + opponent range combination).
+    
+    For each training condition, we evaluate on:
+    1. Same game, same opponents (baseline)
+    2. Same game, different opponents (3 other ranges)  
+    3. Different game, same opponents (3 other games)
+    4. Different game, different opponents (subset of combinations)
+    
+    Args:
+        task_id: SLURM array task ID (0-15 for 4 games × 4 opponent ranges)
+        matrix_config_path: Path to generalization matrix config JSON
+        network_config: Network configuration
+        training_config: Training configuration
+        device: Device for computations
+        output_dirs: Output directories
+        use_adaptive_loss: Whether to use adaptive loss
+        
+    Returns:
+        Dictionary with complete experiment results
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Load matrix configuration
+    with open(matrix_config_path, 'r') as f:
+        matrix_config = json.load(f)
+    
+    # Get training condition for this task
+    training_conditions = matrix_config['training_conditions']
+    if task_id < 0 or task_id >= len(training_conditions):
+        raise ValueError(f"Invalid task_id {task_id}. Must be 0-{len(training_conditions)-1}")
+    
+    train_condition = training_conditions[task_id]
+    train_game = train_condition['game']
+    train_opponent_range = train_condition['opponent_range']
+    train_opponents_probs = train_condition['opponents']
+    
+    logger.info(f"=== GENERALIZATION MATRIX TASK {task_id} ===")
+    logger.info(f"Training: {train_game} with opponents {train_opponents_probs} ({train_opponent_range})")
+    
+    # Get all games and opponent ranges from config
+    all_games = matrix_config['games']
+    opponent_ranges = matrix_config['opponent_ranges']
+    
+    # Create network and trainer
+    train_game_instance = GameFactory.create_game(train_game)
+    network = create_network(network_config, train_game_instance)
+    
+    train_opponents = OpponentFactory.create_opponent_set(train_opponents_probs)
+    
+    trainer = GameTrainer(
+        network=network,
+        training_config=training_config,
+        device=device,
+        use_adaptive_loss=use_adaptive_loss
+    )
+    
+    # === TRAINING PHASE ===
+    logger.info("Starting training phase...")
+    training_results = trainer.train_on_game(
+        game_name=train_game,
+        opponents=train_opponents,
+        save_dir=output_dirs['checkpoints']
+    )
+    logger.info(f"Training completed. Epochs: {training_results.get('final_metrics', {}).get('total_epochs', 'N/A')}")
+    
+    # === EVALUATION PHASE ===
+    logger.info("Starting evaluation phase...")
+    
+    evaluation_results = {}
+    evaluation_summaries = {}
+    
+    eval_config = matrix_config.get('evaluation_config', {})
+    num_sessions = eval_config.get('num_sessions', 20)
+    enable_detailed = eval_config.get('enable_detailed_testing', True)
+    
+    # 1. Baseline: Same game, same opponents
+    logger.info(f"Evaluating: {train_game} + {train_opponent_range} (baseline)")
+    baseline_results = trainer.evaluate(
+        game=train_game_instance,
+        opponents=train_opponents,
+        num_sessions=num_sessions,
+        enable_detailed_testing=enable_detailed,
+        testing_log_dir=os.path.join(output_dirs['logs'], 'eval_baseline')
+    )
+    evaluation_results['baseline'] = {
+        'condition': 'same_game_same_opponents',
+        'game': train_game,
+        'opponent_range': train_opponent_range,
+        'results': baseline_results
+    }
+    evaluation_summaries['baseline'] = summarize_evaluation_results(baseline_results)
+    
+    # 2. Same game, different opponents (test all other opponent ranges)
+    other_ranges = [r for r in opponent_ranges.keys() if r != train_opponent_range]
+    for other_range in other_ranges:
+        other_probs = opponent_ranges[other_range]
+        other_opponents = OpponentFactory.create_opponent_set(other_probs)
+        
+        condition_key = f"same_game_{other_range}"
+        logger.info(f"Evaluating: {train_game} + {other_range}")
+        
+        results = trainer.evaluate(
+            game=train_game_instance,
+            opponents=other_opponents,
+            num_sessions=num_sessions,
+            enable_detailed_testing=enable_detailed,
+            testing_log_dir=os.path.join(output_dirs['logs'], f'eval_{condition_key}')
+        )
+        evaluation_results[condition_key] = {
+            'condition': 'same_game_new_opponents',
+            'game': train_game,
+            'opponent_range': other_range,
+            'results': results
+        }
+        evaluation_summaries[condition_key] = summarize_evaluation_results(results)
+    
+    # 3. Different game, same opponents (test all other games)
+    other_games = [g for g in all_games if g != train_game]
+    for other_game in other_games:
+        other_game_instance = GameFactory.create_game(other_game)
+        
+        condition_key = f"{other_game}_same_opponents"
+        logger.info(f"Evaluating: {other_game} + {train_opponent_range}")
+        
+        results = trainer.evaluate(
+            game=other_game_instance,
+            opponents=train_opponents,
+            num_sessions=num_sessions,
+            enable_detailed_testing=enable_detailed,
+            testing_log_dir=os.path.join(output_dirs['logs'], f'eval_{condition_key}')
+        )
+        evaluation_results[condition_key] = {
+            'condition': 'new_game_same_opponents',
+            'game': other_game,
+            'opponent_range': train_opponent_range,
+            'results': results
+        }
+        evaluation_summaries[condition_key] = summarize_evaluation_results(results)
+    
+    # 4. Different game, different opponents (sample key combinations for preliminary results)
+    # Test each other game with ONE different opponent range (to limit computation)
+    for other_game in other_games:
+        other_game_instance = GameFactory.create_game(other_game)
+        
+        # Pick the "opposite" opponent range for maximum contrast
+        if train_opponent_range in ['low', 'mid_low']:
+            test_range = 'high'
+        else:
+            test_range = 'low'
+        
+        test_probs = opponent_ranges[test_range]
+        test_opponents = OpponentFactory.create_opponent_set(test_probs)
+        
+        condition_key = f"{other_game}_{test_range}"
+        logger.info(f"Evaluating: {other_game} + {test_range} (cross-generalization)")
+        
+        results = trainer.evaluate(
+            game=other_game_instance,
+            opponents=test_opponents,
+            num_sessions=num_sessions,
+            enable_detailed_testing=enable_detailed,
+            testing_log_dir=os.path.join(output_dirs['logs'], f'eval_{condition_key}')
+        )
+        evaluation_results[condition_key] = {
+            'condition': 'new_game_new_opponents',
+            'game': other_game,
+            'opponent_range': test_range,
+            'results': results
+        }
+        evaluation_summaries[condition_key] = summarize_evaluation_results(results)
+    
+    # === COMPUTE GENERALIZATION ERRORS ===
+    baseline_summary = evaluation_summaries['baseline']
+    generalization_errors = {}
+    
+    for condition_key, summary in evaluation_summaries.items():
+        if condition_key != 'baseline':
+            generalization_errors[condition_key] = compute_generalization_error(
+                baseline_summary, summary
+            )
+    
+    # === COMPILE RESULTS ===
+    complete_results = {
+        'task_id': task_id,
+        'training_condition': {
+            'game': train_game,
+            'opponent_range': train_opponent_range,
+            'opponent_probs': train_opponents_probs
+        },
+        'network_config': network_config.__dict__,
+        'training_config': training_config.__dict__,
+        'training_results': training_results,
+        'evaluation_results': evaluation_results,
+        'evaluation_summaries': evaluation_summaries,
+        'generalization_errors': generalization_errors,
+        'network_summary': trainer.network_manager.get_network_summary(),
+        'device': str(device)
+    }
+    
+    # Save results
+    results_file = os.path.join(output_dirs['results'], f'task_{task_id}_results.pkl')
+    save_results(complete_results, results_file)
+    
+    # Create JSON report
+    report = {
+        'task_id': task_id,
+        'training_condition': complete_results['training_condition'],
+        'training_epochs': training_results.get('final_metrics', {}).get('total_epochs', 0),
+        'training_converged': training_results.get('final_metrics', {}).get('convergence_info', {}).get('converged', False) if isinstance(training_results.get('final_metrics', {}).get('convergence_info'), dict) else False,
+        'evaluation_summaries': evaluation_summaries,
+        'generalization_errors': generalization_errors
+    }
+    
+    report_file = os.path.join(output_dirs['results'], f'task_{task_id}_report.json')
+    with open(report_file, 'w') as f:
+        json.dump(report, f, indent=2, cls=NumpyJSONEncoder)
+    
+    # Print summary
+    print(f"\n{'='*70}")
+    print(f"GENERALIZATION MATRIX - TASK {task_id}")
+    print(f"{'='*70}")
+    print(f"Training: {train_game} + {train_opponent_range} ({train_opponents_probs})")
+    print(f"\nBaseline Performance:")
+    print(f"  Mean Reward: {baseline_summary.get('mean_reward', 0):.4f}")
+    print(f"  Cooperation Rate: {baseline_summary.get('mean_cooperation_rate', 0):.4f}")
+    print(f"\nGeneralization Performance:")
+    for cond, summary in evaluation_summaries.items():
+        if cond != 'baseline':
+            error = generalization_errors.get(cond, {})
+            print(f"  {cond}:")
+            print(f"    Reward: {summary.get('mean_reward', 0):.4f} (Δ={error.get('reward_delta', 0):.4f})")
+            print(f"    Coop: {summary.get('mean_cooperation_rate', 0):.4f} (Δ={error.get('cooperation_delta', 0):.4f})")
+    print(f"{'='*70}")
+    
+    logger.info(f"Task {task_id} completed. Report saved to {report_file}")
+    return complete_results
+
+
 def create_experiment_report(
     all_results: List[Dict[str, Any]], 
     output_dirs: Dict[str, str]
@@ -899,7 +1354,15 @@ def main():
         experiment_name = args.experiment_name
     else:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        experiment_name = f"mixed_motive_experiment_{timestamp}"
+        if args.experiment_mode == 'basic':
+            experiment_name = f"basic_generalization_experiment_{timestamp}"
+        elif args.experiment_mode == 'segmented':
+            experiment_name = f"segmented_experiment_{timestamp}"
+        elif args.experiment_mode == 'generalization-matrix':
+            task_id = args.task_id if args.task_id is not None else 0
+            experiment_name = f"generalization_matrix_task_{task_id}_{timestamp}"
+        else:
+            experiment_name = f"mixed_motive_experiment_{timestamp}"
     output_dirs = create_output_dirs(args.output_dir, experiment_name)
     
     # Setup logging
@@ -910,28 +1373,49 @@ def main():
     logger.info("Starting Mixed-Motive Game Experiment")
     logger.info(f"Arguments: {vars(args)}")
     
-    # Parse training games and test game
-    training_games = [game.strip() for game in args.training_games.split(',')]
-    test_game = args.test_game.strip()
-    
     # Validate games
     valid_games = ['hawk-dove', 'prisoners-dilemma', 'battle-of-sexes', 'stag-hunt']
     
-    # Validate training games
-    for game in training_games:
-        if game not in valid_games:
-            raise ValueError(f"Invalid training game '{game}'. Must be one of: {', '.join(valid_games)}")
+    # Parse training games and test game for multi-game modes
+    training_games = [game.strip() for game in args.training_games.split(',')]
+    test_game = args.test_game.strip()
+
+    # Parse basic experiment games
+    train_game = args.train_game.strip()
     
-    # Validate test game
-    if test_game not in valid_games:
-        raise ValueError(f"Invalid test game '{test_game}'. Must be one of: {', '.join(valid_games)}")
-    
-    logger.info(f"Training games: {training_games}")
-    logger.info(f"Test game: {test_game}")
-    
+    # Validate games by experiment mode
+    if args.experiment_mode == 'basic':
+        if train_game not in valid_games:
+            raise ValueError(f"Invalid train game '{train_game}'. Must be one of: {', '.join(valid_games)}")
+        if test_game not in valid_games:
+            raise ValueError(f"Invalid test game '{test_game}'. Must be one of: {', '.join(valid_games)}")
+    elif args.experiment_mode == 'generalization-matrix':
+        # Validation is done inside run_generalization_matrix_experiment using the config file
+        pass
+    else:
+        for game in training_games:
+            if game not in valid_games:
+                raise ValueError(f"Invalid training game '{game}'. Must be one of: {', '.join(valid_games)}")
+        if test_game not in valid_games:
+            raise ValueError(f"Invalid test game '{test_game}'. Must be one of: {', '.join(valid_games)}")
+
+    if args.experiment_mode == 'basic':
+        logger.info(f"Train game: {train_game}")
+        logger.info(f"Test game: {test_game}")
+    else:
+        logger.info(f"Training games: {training_games}")
+        logger.info(f"Test game: {test_game}")
+
     # Parse opponent probabilities
     opponent_probs = [float(p.strip()) for p in args.opponents.split(',')]
-    logger.info(f"Opponent defection probabilities: {opponent_probs}")
+    train_opponent_probs = [float(p.strip()) for p in args.train_opponents.split(',')]
+    test_opponent_probs = [float(p.strip()) for p in args.test_opponents.split(',')]
+
+    if args.experiment_mode == 'basic':
+        logger.info(f"Train opponent defection probabilities: {train_opponent_probs}")
+        logger.info(f"Test opponent defection probabilities: {test_opponent_probs}")
+    else:
+        logger.info(f"Opponent defection probabilities: {opponent_probs}")
     
     # Create configurations
     network_config = NetworkConfig()
@@ -949,8 +1433,13 @@ def main():
         'network_config': network_config.__dict__,
         'training_config': training_config.__dict__,
         'experiment_config': experiment_config.__dict__,
+        'experiment_mode': args.experiment_mode,
         'training_games': training_games,
+        'train_game': train_game,
         'test_game': test_game,
+        'opponent_probabilities': opponent_probs,
+        'train_opponent_probabilities': train_opponent_probs,
+        'test_opponent_probabilities': test_opponent_probs,
         'args': vars(args)
     }
     
@@ -960,7 +1449,36 @@ def main():
     
     # Run experiments (segmented or regular)
     try:
-        if args.segmented_experiments:
+        if args.experiment_mode == 'basic':
+            logger.info("Running basic single-game generalization experiment")
+            result = run_basic_generalization_experiment(
+                train_game=train_game,
+                train_opponent_probs=train_opponent_probs,
+                test_game=test_game,
+                test_opponent_probs=test_opponent_probs,
+                network_config=network_config,
+                training_config=training_config,
+                device=device,
+                output_dirs=output_dirs,
+                use_adaptive_loss=args.adaptive_loss
+            )
+        elif args.experiment_mode == 'generalization-matrix':
+            # Get task_id from args or environment variable (SLURM_ARRAY_TASK_ID)
+            task_id = args.task_id
+            if task_id is None:
+                task_id = int(os.environ.get('SLURM_ARRAY_TASK_ID', 0))
+            
+            logger.info(f"Running generalization-matrix experiment (task {task_id})")
+            result = run_generalization_matrix_experiment(
+                task_id=task_id,
+                matrix_config_path=args.matrix_config,
+                network_config=network_config,
+                training_config=training_config,
+                device=device,
+                output_dirs=output_dirs,
+                use_adaptive_loss=args.adaptive_loss
+            )
+        elif args.experiment_mode == 'segmented':
             logger.info("Running segmented experiments")
             result = run_segmented_experiments(
                 training_games=training_games,
@@ -974,7 +1492,7 @@ def main():
                 opponents_per_segment=args.opponents_per_segment
             )
         else:
-            logger.info("Running single unified experiment")
+            logger.info("Running multi-game experiment")
             result = run_multi_game_experiment(
                 training_games=training_games,
                 test_game=test_game,
@@ -988,13 +1506,9 @@ def main():
                 num_opponents=args.num_opponents,
                 include_opponent_boundaries=args.include_opponent_boundaries
             )
-        
-        # Create final report
-        if args.segmented_experiments:
-            # For segmented experiments, create reports for each segment
+
+        if args.experiment_mode == 'segmented':
             logger.info("Creating segmented experiment reports...")
-            
-            # Create a combined report for all segments
             combined_report = {
                 'experiment_summary': {
                     'experiment_type': 'segmented_experiments',
@@ -1005,23 +1519,19 @@ def main():
                 },
                 'segment_reports': {}
             }
-            
-            # Create individual reports for each segment
+
             for segment_id, segment_data in result['segmented_results'].items():
                 segment_config = segment_data['segment_config']
                 segment_results = segment_data['results']
-                
-                # Create individual segment report
+
                 create_multi_game_report(segment_results, output_dirs)
-                
-                # Extract opponent probabilities for serialization
+
                 opponent_probs_for_segment = []
                 for opponent in segment_config['opponents']:
                     type_param = opponent.get_type_parameter()
                     if type_param is not None:
                         opponent_probs_for_segment.append(type_param)
-                
-                # Add to combined report (exclude raw opponents to avoid serialization issues)
+
                 combined_report['segment_reports'][segment_id] = {
                     'segment_config': {
                         'experiment_id': segment_config['experiment_id'],
@@ -1037,19 +1547,17 @@ def main():
                         'segment_range': segment_config['segment_range']
                     }
                 }
-            
-            # Save combined segmented report
+
             combined_report_file = os.path.join(output_dirs['results'], 'segmented_experiments_report.json')
             with open(combined_report_file, 'w') as f:
                 json.dump(combined_report, f, indent=2, cls=NumpyJSONEncoder)
-            
+
             logger.info(f"Segmented experiments report saved to {combined_report_file}")
-        else:
-            # For single experiments, use the regular report
+        elif args.experiment_mode == 'multi-game':
             create_multi_game_report(result, output_dirs)
         
     except Exception as e:
-        logger.error(f"Error in multi-game experiment: {str(e)}")
+        logger.error(f"Error in experiment: {str(e)}")
         raise
     
     logger.info("All experiments completed successfully!")
