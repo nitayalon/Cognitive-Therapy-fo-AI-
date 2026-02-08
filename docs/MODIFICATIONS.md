@@ -70,6 +70,49 @@ Instead of predicting pointwise actions, incentivize reasoning about opponent's 
 
 ## Training Procedure Modifications
 
+### Single-game generalization experiment (2026-02-05)
+
+**File(s) Modified**:
+- `main_experiment.py`
+- `src/cognitive_therapy_ai/trainer.py`
+
+**Change Type**: Introduced a basic experiment mode that trains on a single game against a single opponent spectrum, then evaluates generalization across three OOD conditions.
+
+**Technical Details**:
+```python
+# New basic experiment mode (conceptual flow)
+train_results = trainer.train_on_game(train_game, train_opponents)
+
+# In-distribution baseline
+eval_in = trainer.evaluate(train_game, train_opponents)
+
+# OOD evaluations
+eval_same_game_new_opponents = trainer.evaluate(train_game, test_opponents)
+eval_new_game_same_opponents = trainer.evaluate(test_game, train_opponents)
+eval_new_game_new_opponents = trainer.evaluate(test_game, test_opponents)
+
+# Generalization error (example)
+error = baseline_mean_reward - condition_mean_reward
+```
+
+**Algorithm Changes**:
+1. **Single-game focus**: Training loop targets one game only.
+2. **Opponent spectrum**: Training opponents are defined by a single probability range (e.g., [0.1, 0.3]).
+3. **Generalization suite**: Evaluation covers same-game/new-opponents, new-game/same-opponents, and new-game/new-opponents.
+4. **Report outputs**: JSON summary includes per-condition averages and generalization error.
+
+**Rationale**:
+This isolates maladaptiveness as a function of training data distribution by explicitly separating game shift and opponent shift.
+
+**Expected Impact**:
+- Cleaner experimental control over distribution shifts
+- Direct measurement of generalization error across game/opponent axes
+- Better comparability across training conditions
+
+**Testing Plan**:
+- [ ] Run a quick basic experiment with small epochs to validate report generation
+- [ ] Verify evaluation outputs include all opponent labels without collisions
+
 ### Simoultanious game training - 20/10/2025
 
 **File(s) Modified**:

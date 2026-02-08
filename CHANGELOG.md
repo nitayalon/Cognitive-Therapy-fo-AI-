@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Basic Single-Game Generalization Experiment (2026-02-05)**
+  - New `basic` experiment mode for single-game training with explicit generalization tests
+  - Evaluates three conditions: same game/new opponents, new game/same opponents, new game/new opponents
+  - Generates `basic_generalization_report.json` with summarized metrics and generalization error
+  - Files: `main_experiment.py`
+
+### Fixed
+- **Evaluation Label Collisions (2026-02-05)**
+  - Evaluation results now use unique opponent labels (opponent id or probability) to avoid overwriting
+  - Files: `src/cognitive_therapy_ai/trainer.py`
+
+### Added
 - **Segmented Experiment System (2025-11-14)**: Multiple experiment generation for different probability ranges
   - **Segmented Experiment Creation**:
     - New `OpponentFactory.create_segmented_experiment_configs()` method for creating separate experiments per probability segment

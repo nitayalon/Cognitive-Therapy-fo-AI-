@@ -1,11 +1,15 @@
 # Cognitive Therapy for AI: Mixed-Motive Game Training Framework
 
-This repository implements a comprehensive framework for training LSTM networks on mixed-motive games to study representation changes as a function of training data and opponent behavior. The project presents a conceptual treatment paradigm aimed at identifying changes in neural network representations through iterative game-theoretic interactions.
+This repository implements a framework for training RRN (LSTM) networks on mixed-motive games to study representation failure (maladaptiveness) as a function of training game and opponent behavior. 
+The core workflow trains on a **single game** against a **single spectrum of opponents**, then evaluates generalization across:
+1. **Same game, new opponents**
+2. **New game, same opponents**
+3. **New game, new opponents**
 
 ## Project Overview
 
-The framework implements a **Theory of Mind Reinforcement Learning (ToM-RL)** approach, training LSTM networks on four classic mixed-motive games:
-- **Hawk-Dove Game**: Resource competition with potential for costly conflict
+The framework implements a **Multi-Agent Reinforcement Learning (MARL)** approach with support for four classic mixed-motive games:
+- **Hawk-Dove Game**: Resource competition with potential for costly conflict 
 - **Prisoner's Dilemma**: Classic cooperation vs. defection dilemma
 - **Battle of the Sexes**: Coordination game with conflicting preferences
 - **Stag Hunt**: Coordination game balancing mutual benefit vs. individual security
@@ -53,15 +57,15 @@ pip install -e .
 ## Quick Start
 
 ### Basic Usage
-Train networks on all three games with default settings:
+Run the basic single-game generalization experiment:
 ```bash
-python main_experiment.py --game all --opponents 0.1,0.3,0.5,0.7,0.9
+python main_experiment.py --experiment-mode basic --train-game prisoners-dilemma --train-opponents 0.1,0.3 --test-game hawk-dove --test-opponents 0.7,0.9
 ```
 
-### Single Game Training
-Train on a specific game:
+### Single Game Training (In-Distribution)
+Train on a specific game with a focused opponent spectrum:
 ```bash
-python main_experiment.py --game prisoners-dilemma --num-games 100 --max-epochs 500
+python main_experiment.py --experiment-mode basic --train-game prisoners-dilemma --train-opponents 0.1,0.3
 ```
 
 ### Using Configuration Files
@@ -73,6 +77,11 @@ python main_experiment.py --config config/default_config.json
 For testing and debugging:
 ```bash
 python main_experiment.py --config config/quick_test_config.json --verbose
+```
+
+### Multi-Game Experiment (Legacy)
+```bash
+python main_experiment.py --experiment-mode multi-game --training-games prisoners-dilemma,hawk-dove --test-game stag-hunt --opponents 0.1,0.3,0.5,0.7,0.9
 ```
 
 ## Framework Architecture
@@ -153,17 +162,22 @@ experiment_config = ExperimentConfig(
 python main_experiment.py [OPTIONS]
 
 Options:
-  --config PATH              Path to JSON configuration file
-  --game {hawk-dove,prisoners-dilemma,battle-of-sexes,stag-hunt,all}
-                            Game(s) to train on (default: all)
-  --opponents PROBS         Comma-separated defection probabilities (default: 0.1,0.3,0.5,0.7,0.9)
-  --num-games INT           Games per partner - T parameter (default: 100)
-  --max-epochs INT          Maximum training epochs (default: 500)
-  --output-dir PATH         Output directory (default: experiments)
-  --seed INT                Random seed (default: 42)
-  --device {cpu,cuda,auto}  Training device (default: auto)
-  --adaptive-loss           Use adaptive loss weighting
-  --verbose                 Enable verbose logging
+    --experiment-mode {basic,multi-game,segmented}
+                                                        Experiment mode (default: basic)
+    --config PATH              Path to JSON configuration file
+    --train-game NAME          Train game for basic mode
+    --training-games LIST      Comma-separated training games for multi-game mode
+    --test-game NAME           Test game (basic + multi-game)
+    --train-opponents PROBS    Comma-separated training opponent defection probabilities (basic mode)
+    --test-opponents PROBS     Comma-separated test opponent defection probabilities (basic mode)
+    --opponents PROBS          Comma-separated defection probabilities (multi-game/segmented)
+    --num-games INT            Games per partner - T parameter (default: 100)
+    --max-epochs INT           Maximum training epochs (default: 500)
+    --output-dir PATH          Output directory (default: experiments)
+    --seed INT                 Random seed (default: 42)
+    --device {cpu,cuda,auto}   Training device (default: auto)
+    --adaptive-loss            Use adaptive loss weighting
+    --verbose                  Enable verbose logging
 ```
 
 ## Output Structure
@@ -171,16 +185,13 @@ Options:
 Experiments create organized output directories:
 ```
 experiments/
-└── mixed_motive_experiment_YYYYMMDD_HHMMSS/
+└── basic_generalization_experiment_YYYYMMDD_HHMMSS/
     ├── checkpoints/          # Model checkpoints
-    ├── logs/                 # Training logs
+    ├── logs/                 # Training/testing logs
     ├── plots/                # Visualization plots
     ├── results/              # Experiment results
-    │   ├── hawk-dove_results.pkl
-    │   ├── prisoners-dilemma_results.pkl
-    │   ├── battle-of-sexes_results.pkl
-    │   ├── stag-hunt_results.pkl
-    │   └── experiment_report.json
+    │   ├── basic_generalization_results.pkl
+    │   └── basic_generalization_report.json
     └── experiment_config.json
 ```
 
