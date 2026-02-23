@@ -606,6 +606,225 @@ class LossAnalyzer:
             return 0.0
 
 
+class VanillaRLLoss(nn.Module):
+    """
+    Vanilla Reinforcement Learning Loss Function (Baseline).
+    
+    Pure policy gradient with advantage estimation - no auxiliary tasks.
+    This serves as the baseline agent for comparison with proto-ToM agents.
+    
+    Total Loss: L = LRL + value_loss
+    
+    Where:
+    - LRL: Reinforcement Learning Loss (policy gradient with advantage)
+    - value_loss: Mean squared error for value function learning
+    
+    No opponent modeling or auxiliary tasks - agent is opponent-unaware.
+    """
+    
+    def __init__(
+        self,
+        gamma: float = 0.99,
+        use_gae: bool = True,
+        gae_lambda: float = 0.95,
+        value_loss_coef: float = 0.5,
+        reward_scale: float = 1.0
+    ):
+        """
+        Initialize Vanilla RL loss function.
+        
+        Args:
+            gamma: Discount factor for reward calculation
+            use_gae: Whether to use Generalized Advantage Estimation
+            gae_lambda: GAE lambda parameter for bias-variance tradeoff
+            value_loss_coef: Coefficient for value function loss
+            reward_scale: Expected scale of rewards (for logging/normalization)
+        """
+        super(VanillaRLLoss, self).__init__()
+        
+        self.gamma = gamma
+        self.use_gae = use_gae
+        self.gae_lambda = gae_lambda
+        self.value_loss_coef = value_loss_coef
+        self.reward_scale = reward_scale
+        
+        # For compatibility with ToMRLLoss interface
+        self.alpha = 0.0  # No auxiliary task
+        
+        # Running statistics for logging
+        self.register_buffer('rl_loss_ema', torch.tensor(1.0))
+        self.register_buffer('value_loss_ema', torch.tensor(1.0))
+        self.register_buffer('update_count', torch.tensor(0))
+        self.ema_decay = 0.99
+        
+        self.logger = logging.getLogger(__name__)
+    
+    def forward(
+        self,
+        policy_logits: torch.Tensor,
+        opponent_policy_logits: torch.Tensor,  # Ignored for vanilla
+        value_estimates: torch.Tensor,
+        actions_taken: torch.Tensor,
+        rewards: torch.Tensor,
+        opponent_actions: torch.Tensor,  # Ignored for vanilla
+        true_opponent_policy: torch.Tensor,  # Ignored for vanilla
+        dones: Optional[torch.Tensor] = None,
+        next_value: Optional[torch.Tensor] = None
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Calculate Vanilla RL loss (policy gradient + value function).
+        
+        Args:
+            policy_logits: Action logits from policy head (batch_size, num_actions)
+            opponent_policy_logits: IGNORED - present for interface compatibility
+            value_estimates: Value function estimates (batch_size, 1)
+            actions_taken: Actions actually taken by the agent (batch_size,)
+            rewards: Rewards received (batch_size,)
+            opponent_actions: IGNORED - present for interface compatibility
+            true_opponent_policy: IGNORED - present for interface compatibility
+            dones: Episode termination flags (batch_size,), optional
+            next_value: Value estimate for next state (for advantage calculation)
+            
+        Returns:
+            Dictionary containing losses compatible with ToMRLLoss interface
+        """
+        batch_size = policy_logits.size(0)
+        
+        # 1. Calculate Reinforcement Learning Loss (LRL)
+        rl_loss, advantages = self._calculate_rl_loss(
+            policy_logits, actions_taken, rewards, value_estimates, dones, next_value
+        )
+        
+        # 2. Calculate Value Function Loss
+        value_loss = self._calculate_value_loss(value_estimates, rewards, advantages)
+        
+        # 3. Combined loss (weighted value loss)
+        total_loss = rl_loss + self.value_loss_coef * value_loss
+        
+        # Update running statistics
+        if self.training:
+            self.update_count += 1
+            decay = min(self.ema_decay, 1.0 - 1.0 / self.update_count.float())
+            self.rl_loss_ema = decay * self.rl_loss_ema + (1 - decay) * rl_loss.detach()
+            self.value_loss_ema = decay * self.value_loss_ema + (1 - decay) * value_loss.detach()
+        
+        # Return dictionary compatible with ToMRLLoss interface
+        # Set auxiliary task losses to zero for logging compatibility
+        return {
+            'total_loss': total_loss,
+            'rl_loss': rl_loss,
+            'rl_loss_normalized': rl_loss,  # No normalization for vanilla
+            'value_loss': value_loss,
+            'opponent_policy_loss': torch.tensor(0.0, device=rl_loss.device),  # Zero for vanilla
+            'opponent_policy_loss_normalized': torch.tensor(0.0, device=rl_loss.device),
+            'loss_ratio': 0.0,  # No auxiliary task
+            'alpha_contribution': 0.0,  # No auxiliary task
+            'advantages': advantages,
+            'alpha': 0.0,  # No auxiliary task
+            'temperature': 0.0,  # Not applicable
+            'normalization_stats': {
+                'rl_loss_scale': self.rl_loss_ema.item(),
+                'value_loss_scale': self.value_loss_ema.item()
+            }
+        }
+    
+    def _calculate_rl_loss(
+        self,
+        policy_logits: torch.Tensor,
+        actions_taken: torch.Tensor,
+        rewards: torch.Tensor,
+        value_estimates: torch.Tensor,
+        dones: Optional[torch.Tensor] = None,
+        next_value: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Calculate reinforcement learning loss using policy gradient with advantage.
+        
+        LRL = -E_t[log π(a_t|s_t) * Â_t]
+        
+        Where Â_t is the advantage estimate: Â_t = R_t - V_θ(s_t)
+        """
+        # Convert logits to log probabilities
+        log_probs = F.log_softmax(policy_logits, dim=-1)
+        
+        # Gather log probabilities for actions taken
+        action_log_probs = log_probs.gather(1, actions_taken.unsqueeze(1)).squeeze(1)
+        
+        # Calculate advantages
+        advantages = self._calculate_advantages(
+            rewards, value_estimates, dones, next_value
+        )
+        
+        # Policy gradient loss: -E[log π(a|s) * advantage]
+        rl_loss = -(action_log_probs * advantages.detach()).mean()
+        
+        return rl_loss, advantages
+    
+    def _calculate_value_loss(
+        self,
+        value_estimates: torch.Tensor,
+        rewards: torch.Tensor,
+        advantages: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Calculate value function loss (MSE).
+        
+        L_value = MSE(V_θ(s_t), R_t)
+        """
+        # Target values are rewards (or advantages + value_estimates for TD)
+        value_targets = rewards
+        
+        # Mean squared error
+        value_loss = F.mse_loss(value_estimates.squeeze(), value_targets)
+        
+        return value_loss
+    
+    def _calculate_advantages(
+        self,
+        rewards: torch.Tensor,
+        value_estimates: torch.Tensor,
+        dones: Optional[torch.Tensor] = None,
+        next_value: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Calculate advantage estimates.
+        
+        Simple advantage: A_t = R_t - V(s_t)
+        GAE: Uses temporal difference errors with exponential weighting
+        """
+        value_estimates_squeezed = value_estimates.squeeze()
+        
+        if self.use_gae and next_value is not None:
+            # Generalized Advantage Estimation
+            advantages = []
+            gae = 0.0
+            
+            for t in reversed(range(len(rewards))):
+                # TD error
+                if t == len(rewards) - 1 and next_value is not None:
+                    next_val = next_value.squeeze() if isinstance(next_value, torch.Tensor) else next_value
+                else:
+                    next_val = value_estimates_squeezed[t + 1] if t < len(rewards) - 1 else 0.0
+                
+                # Check for episode termination
+                mask = 0.0 if (dones is not None and t < len(dones) and dones[t]) else 1.0
+                
+                delta = rewards[t] + self.gamma * next_val * mask - value_estimates_squeezed[t]
+                gae = delta + self.gamma * self.gae_lambda * mask * gae
+                advantages.insert(0, gae)
+            
+            advantages = torch.stack(advantages)
+        else:
+            # Simple advantage estimation: A = R - V(s)
+            advantages = rewards - value_estimates_squeezed
+        
+        # Normalize advantages for stable learning
+        if len(advantages) > 1:
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        
+        return advantages
+
+
 def estimate_game_reward_scale(game_name: str) -> float:
     """
     Estimate appropriate reward scale for normalization based on game type.

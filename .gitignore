@@ -215,3 +215,6 @@ slurm_logs/
 slurm-*.out
 slurm-*.err
 SLURM_FIXES_SUMMARY.md
+
+# General scripts and diagnostics (not for git)
+general_scripts/

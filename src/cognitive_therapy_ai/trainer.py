@@ -23,7 +23,7 @@ from .games import MixedMotiveGame, Action, GameFactory
 from .opponent import Opponent, OpponentFactory
 from .network import GameLSTM, NetworkManager
 from .loss import CompositeLoss, AdaptiveLoss
-from .tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss, LossAnalyzer
+from .tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss, VanillaRLLoss, LossAnalyzer
 from .utils import MetricsTracker, set_random_seeds
 from .config import TrainingConfig, NetworkConfig
 from .training_monitor import TrainingMonitor, BatchedTrainingMonitor
@@ -258,7 +258,8 @@ class GameTrainer:
         network: GameLSTM,
         training_config: TrainingConfig,
         device: Optional[torch.device] = None,
-        use_adaptive_loss: bool = False
+        use_adaptive_loss: bool = False,
+        agent_type: str = "proto-tom"
     ):
         """
         Initialize the game trainer.
@@ -267,29 +268,45 @@ class GameTrainer:
             network: The LSTM network to train
             training_config: Training configuration parameters
             device: Device for computations
-            use_adaptive_loss: Whether to use adaptive loss weighting
+            use_adaptive_loss: Whether to use adaptive loss weighting (proto-ToM only)
+            agent_type: Type of agent - "vanilla" (pure RL) or "proto-tom" (with auxiliary tasks)
         """
         self.network = network
         self.config = training_config
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.network.to(self.device)
+        self.agent_type = agent_type.lower()
         
         # Initialize optimizer
         self.optimizer = optim.Adam(self.network.parameters(), lr=self.config.learning_rate)
         
-        # Initialize loss function - use ToM-RL losses (current framework)
-        if use_adaptive_loss:
-            self.loss_fn = AdaptiveToMRLLoss(
-                initial_alpha=self.config.action_prediction_loss_weight,
+        # Initialize loss function based on agent type
+        if self.agent_type == "vanilla":
+            # Vanilla RL: Pure policy gradient without auxiliary tasks
+            self.loss_fn = VanillaRLLoss(
                 gamma=0.99,
                 use_gae=True
             )
+            self.logger = logging.getLogger(__name__)
+            self.logger.info("Initialized Vanilla RL agent (opponent-unaware)")
+        elif self.agent_type in ["proto-tom", "proto_tom", "tom"]:
+            # Proto-ToM: RL with opponent modeling auxiliary tasks
+            if use_adaptive_loss:
+                self.loss_fn = AdaptiveToMRLLoss(
+                    initial_alpha=self.config.action_prediction_loss_weight,
+                    gamma=0.99,
+                    use_gae=True
+                )
+            else:
+                self.loss_fn = ToMRLLoss(
+                    alpha=self.config.action_prediction_loss_weight,
+                    gamma=0.99,
+                    use_gae=True
+                )
+            self.logger = logging.getLogger(__name__)
+            self.logger.info(f"Initialized Proto-ToM agent with {'adaptive' if use_adaptive_loss else 'fixed'} alpha")
         else:
-            self.loss_fn = ToMRLLoss(
-                alpha=self.config.action_prediction_loss_weight,
-                gamma=0.99,
-                use_gae=True
-            )
+            raise ValueError(f"Unknown agent_type: {agent_type}. Must be 'vanilla' or 'proto-tom'")
         
         # Tracking and analysis
         self.loss_analyzer = LossAnalyzer()
@@ -316,7 +333,8 @@ class GameTrainer:
         self.epoch_rewards = []  # Store cumulative rewards per epoch
         self.epoch_cooperation_rates = []  # Store network cooperation rates per epoch
         
-        self.logger = logging.getLogger(__name__)
+        if not hasattr(self, 'logger'):
+            self.logger = logging.getLogger(__name__)
     
     def save_experiment_metadata(
         self,
@@ -406,8 +424,12 @@ class GameTrainer:
             f.write(f"Games per Partner: {self.config.num_games_per_partner}\n")
             f.write(f"Patience: {self.config.patience}\n")
             f.write(f"Convergence Threshold: {self.config.convergence_threshold}\n")
+            f.write(f"Agent Type: {self.agent_type.upper()}\n")
             f.write(f"Loss Type: {type(self.loss_fn).__name__}\n")
-            f.write(f"Loss Alpha: {getattr(self.loss_fn, 'alpha', 'N/A')}\n\n")
+            if self.agent_type == "proto-tom":
+                f.write(f"Loss Alpha: {getattr(self.loss_fn, 'alpha', 'N/A')}\n\n")
+            else:
+                f.write(f"Loss Alpha: N/A (Vanilla RL - no auxiliary tasks)\n\n")
             
             if game_configs:
                 f.write("GAME CONFIGURATION\n")

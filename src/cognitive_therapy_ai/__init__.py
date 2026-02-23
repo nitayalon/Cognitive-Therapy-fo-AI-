@@ -12,7 +12,7 @@ from .games import HawkDove, PrisonersDilemma, BattleOfSexes, StagHunt, GameFact
 from .opponent import Opponent, OpponentFactory
 from .network import GameLSTM
 from .trainer import GameTrainer
-from .tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss
+from .tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss, VanillaRLLoss
 from .training_monitor import TrainingMonitor, BatchedTrainingMonitor
 
 __all__ = [
@@ -28,6 +28,7 @@ __all__ = [
     "GameTrainer",
     "ToMRLLoss",
     "AdaptiveToMRLLoss",
+    "VanillaRLLoss",
     "TrainingMonitor",
     "BatchedTrainingMonitor"
 ]

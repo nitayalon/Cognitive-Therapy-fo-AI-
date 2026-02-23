@@ -233,6 +233,14 @@ def parse_arguments():
         help='Custom experiment name (overrides timestamp-based naming)'
     )
     
+    parser.add_argument(
+        '--agent-type',
+        type=str,
+        choices=['vanilla', 'proto-tom'],
+        default='proto-tom',
+        help='Agent type: vanilla (reward-only baseline) or proto-tom (with opponent modeling)'
+    )
+    
     return parser.parse_args()
 
 
@@ -272,7 +280,8 @@ def run_segmented_experiments(
     device: torch.device,
     output_dirs: Dict[str, str],
     use_adaptive_loss: bool = False,
-    opponents_per_segment: int = 5
+    opponents_per_segment: int = 5,
+    agent_type: str = 'proto-tom'
 ) -> Dict[str, Any]:
     """
     Run separate experiments for each segment of opponent probability ranges.
@@ -367,7 +376,8 @@ def run_multi_game_experiment(
     equally_spaced_opponents: bool = False,
     num_opponents: int = 11,
     include_opponent_boundaries: bool = False,
-    segment_info: Optional[Dict[str, Any]] = None
+    segment_info: Optional[Dict[str, Any]] = None,
+    agent_type: str = 'proto-tom'
 ) -> Dict[str, Any]:
     """
     Run experiment with training on multiple games and testing on a separate game.
@@ -420,7 +430,8 @@ def run_multi_game_experiment(
         network=network,
         training_config=training_config,
         device=device,
-        use_adaptive_loss=use_adaptive_loss
+        use_adaptive_loss=use_adaptive_loss,
+        agent_type=agent_type
     )
     
     # Phase 1: Simultaneous multi-game training
@@ -504,7 +515,8 @@ def run_single_game_experiment(
     use_adaptive_loss: bool = False,
     equally_spaced_opponents: bool = False,
     num_opponents: int = 11,
-    include_opponent_boundaries: bool = False
+    include_opponent_boundaries: bool = False,
+    agent_type: str = 'proto-tom'
 ) -> Dict[str, Any]:
     """
     Run training experiment on a single game.
@@ -548,7 +560,8 @@ def run_single_game_experiment(
         network=network,
         training_config=training_config,
         device=device,
-        use_adaptive_loss=use_adaptive_loss
+        use_adaptive_loss=use_adaptive_loss,
+        agent_type=agent_type
     )
     
     # Run training
@@ -637,7 +650,8 @@ def run_basic_generalization_experiment(
     training_config: TrainingConfig,
     device: torch.device,
     output_dirs: Dict[str, str],
-    use_adaptive_loss: bool = False
+    use_adaptive_loss: bool = False,
+    agent_type: str = 'proto-tom'
 ) -> Dict[str, Any]:
     """
     Run single-game training and three generalization evaluations.
@@ -661,7 +675,8 @@ def run_basic_generalization_experiment(
         network=network,
         training_config=training_config,
         device=device,
-        use_adaptive_loss=use_adaptive_loss
+        use_adaptive_loss=use_adaptive_loss,
+        agent_type=agent_type
     )
 
     training_results = trainer.train_on_game(
@@ -764,7 +779,8 @@ def run_generalization_matrix_experiment(
     training_config: TrainingConfig,
     device: torch.device,
     output_dirs: Dict[str, str],
-    use_adaptive_loss: bool = False
+    use_adaptive_loss: bool = False,
+    agent_type: str = 'proto-tom'
 ) -> Dict[str, Any]:
     """
     Run a single task from the generalization matrix experiment.
@@ -823,7 +839,8 @@ def run_generalization_matrix_experiment(
         network=network,
         training_config=training_config,
         device=device,
-        use_adaptive_loss=use_adaptive_loss
+        use_adaptive_loss=use_adaptive_loss,
+        agent_type=agent_type
     )
     
     # === TRAINING PHASE ===
@@ -1460,7 +1477,8 @@ def main():
                 training_config=training_config,
                 device=device,
                 output_dirs=output_dirs,
-                use_adaptive_loss=args.adaptive_loss
+                use_adaptive_loss=args.adaptive_loss,
+                agent_type=args.agent_type
             )
         elif args.experiment_mode == 'generalization-matrix':
             # Get task_id from args or environment variable (SLURM_ARRAY_TASK_ID)
@@ -1476,7 +1494,8 @@ def main():
                 training_config=training_config,
                 device=device,
                 output_dirs=output_dirs,
-                use_adaptive_loss=args.adaptive_loss
+                use_adaptive_loss=args.adaptive_loss,
+                agent_type=args.agent_type
             )
         elif args.experiment_mode == 'segmented':
             logger.info("Running segmented experiments")
@@ -1489,7 +1508,8 @@ def main():
                 device=device,
                 output_dirs=output_dirs,
                 use_adaptive_loss=args.adaptive_loss,
-                opponents_per_segment=args.opponents_per_segment
+                opponents_per_segment=args.opponents_per_segment,
+                agent_type=args.agent_type
             )
         else:
             logger.info("Running multi-game experiment")
@@ -1504,7 +1524,8 @@ def main():
                 use_adaptive_loss=args.adaptive_loss,
                 equally_spaced_opponents=args.equally_spaced_opponents,
                 num_opponents=args.num_opponents,
-                include_opponent_boundaries=args.include_opponent_boundaries
+                include_opponent_boundaries=args.include_opponent_boundaries,
+                agent_type=args.agent_type
             )
 
         if args.experiment_mode == 'segmented':
