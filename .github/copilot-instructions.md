@@ -1,6 +1,6 @@
 # Cognitive Therapy for AI - Development Guide
 
-This framework implements **Theory of Mind Reinforcement Learning (ToM-RL)** for training LSTM networks on mixed-motive games. The core architecture combines policy learning with opponent behavior prediction to create Theory of Mind inductive bias.
+This framework investigates the (in)ability of RL agents to generalize across social games with different opponent types, and whether adding Theory of Mind (ToM) auxiliary tasks can improve generalization. The codebase is organized into core training components, game implementations, and analysis scripts. This document provides an overview of the architecture, development patterns, and guidelines for contributing to the project.
 
 ## Architecture Overview
 
@@ -192,3 +192,13 @@ The ToM-RL approach creates inductive bias for understanding opponent behavior p
 3. **Parameter Impact**: Explain effect of parameter modifications
 4. **Research Rationale**: Connect changes to research hypotheses
 5. **Testing Plan**: Define validation approach for each change
+
+## General guidelines:
+1. **Reuse existing code when possible** - avoid creating new scripts and files for each task
+2. **Document all changes in detail** - use the documentation standards above
+3. **Maintain clear commit history** - use descriptive commit messages
+4. **Keep the codebase organized** - follow existing patterns and structures
+5. **Focus on research implications** - connect code changes to research questions and hypotheses   
+6. **Seperate analysis code from experiemtnnt code** - use the `experiments/analysis_scripts/` directory for all analysis and visualization code, and keep it separate from the core training and experiment code in `src/`
+7. **Use the configuration system** - avoid hardcoding parameters in scripts, use the existing configuration system for all experiment settings
+8. **Validate changes with tests** - use the existing test scripts for quick validation of changes
