@@ -21,17 +21,18 @@ Training conditions are defined in `config/generalization_matrix_config.json`:
 3. Stag Hunt (stag-hunt)
 
 ### Opponent Ranges:
-1. **Low defection:** [0.1, 0.2, 0.3, 0.4]
-2. **Mid-low defection:** [0.3, 0.4, 0.5, 0.6]
-3. **Mid-high defection:** [0.5, 0.6, 0.7, 0.8]
-4. **High defection:** [0.7, 0.8, 0.9, 1.0]
+1. **Very low defection:** [0.0, 0.2]
+2. **Low defection:** [0.2, 0.4]
+3. **Mid defection:** [0.4, 0.6]
+4. **High defection:** [0.6, 0.8]
+5. **Very high defection:** [0.8, 1.0]
 
 ### Evaluation Coverage
 
-For each trained agent (16 total), we test on:
+For each trained agent (15 total), we test on:
 1. **Baseline:** Same game, same opponents (1 condition)
-2. **Same game, different opponents:** Same game, 3 other opponent ranges (3 conditions)
-3. **Different game, same opponents:** 3 other games, same opponent range (3 conditions)
+2. **Same game, different opponents:** Same game, 4 other opponent ranges (4 conditions)
+3. **Different game, same opponents:** 2 other games, same opponent range (2 conditions)
 4. **Cross-generalization:** Other games + other opponents (selected combinations)
 
 **Total evaluations per agent:** ~10-13 conditions  

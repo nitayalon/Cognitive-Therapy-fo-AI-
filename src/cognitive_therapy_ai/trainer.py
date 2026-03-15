@@ -587,7 +587,7 @@ class GameTrainer:
                 )
             
             # Save checkpoint
-            if save_dir and epoch % 50 == 0:
+            if save_dir and epoch % self.config.checkpoint_frequency == 0:
                 checkpoint_path = os.path.join(save_dir, f"checkpoint_epoch_{epoch}.pt")
                 self.network_manager.save_checkpoint(
                     checkpoint_path, 
@@ -694,7 +694,7 @@ class GameTrainer:
                 break
             
             # Save checkpoint
-            if save_dir and epoch % 50 == 0:
+            if save_dir and epoch % self.config.checkpoint_frequency == 0:
                 checkpoint_path = os.path.join(save_dir, f"multi_game_checkpoint_epoch_{epoch}.pt")
                 self.network_manager.save_checkpoint(
                     checkpoint_path, 

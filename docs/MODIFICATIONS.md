@@ -70,6 +70,77 @@ Instead of predicting pointwise actions, incentivize reasoning about opponent's 
 
 ## Training Procedure Modifications
 
+### Configurable Checkpoint Frequency (2026-02-23)
+
+**File(s) Modified**:
+- `src/cognitive_therapy_ai/config.py`
+- `src/cognitive_therapy_ai/trainer.py`
+- `config/default_config.json`
+- `config/generalization_matrix_config.json`
+- `config/quick_test_config.json`
+
+**Change Type**: Made network weight checkpoint saving frequency configurable instead of hardcoded.
+
+**Technical Details**:
+```python
+# BEFORE (hardcoded in trainer.py)
+if save_dir and epoch % 50 == 0:
+    checkpoint_path = os.path.join(save_dir, f"checkpoint_epoch_{epoch}.pt")
+    self.network_manager.save_checkpoint(...)
+
+# AFTER (configurable via config)
+# In config.py
+@dataclass
+class TrainingConfig:
+    checkpoint_frequency: int = 100  # Save network weights every N epochs
+    # ... other parameters
+
+# In trainer.py  
+if save_dir and epoch % self.config.checkpoint_frequency == 0:
+    checkpoint_path = os.path.join(save_dir, f"checkpoint_epoch_{epoch}.pt")
+    self.network_manager.save_checkpoint(...)
+
+# In config JSON files
+{
+  "training_config": {
+    "checkpoint_frequency": 100,  # Default: 100 epochs
+    ...
+  }
+}
+```
+
+**Rationale**:
+1. **Flexibility**: Different experiments require different checkpoint frequencies
+   - Quick tests: Save every 50 epochs for frequent monitoring
+   - Long runs: Save every 500 epochs to reduce disk I/O
+   - Standard: 100 epochs balances storage and analysis granularity
+
+2. **Research Requirements**: Analysis of network weight evolution across training requires:
+   - Consistent checkpoint intervals across experiments
+   - Configurable frequency for different experimental designs
+   - Balance between storage cost and temporal resolution
+
+3. **Data Collection**: Users requested control over when network weights are saved for gradient analysis
+
+**Expected Impact**:
+- **Storage**: ~500KB-2MB per checkpoint, configurable frequency controls total storage
+- **Analysis**: Temporal resolution of weight evolution can be adjusted per experiment
+- **Flexibility**: No code changes needed to adjust checkpoint frequency
+
+**Configuration Options**:
+- Default: 100 epochs (5 checkpoints in 500-epoch run)
+- Quick test: 50 epochs (more frequent for debugging)
+- Long runs: 500 epochs (final checkpoint only for very long experiments)
+
+**Testing Plan**:
+- [x] Add checkpoint_frequency to TrainingConfig dataclass
+- [x] Update trainer.py to use config parameter (2 locations)
+- [x] Add to all config JSON files
+- [ ] Test with different frequencies (50, 100, 500)
+- [ ] Verify checkpoint loading still works correctly
+
+---
+
 ### Single-game generalization experiment (2026-02-05)
 
 **File(s) Modified**:

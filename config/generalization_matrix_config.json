@@ -9,25 +9,29 @@
   ],
   
   "opponent_ranges": {
-    "low": [0.1, 0.3],
-    "mid_low": [0.3, 0.5],
-    "mid_high": [0.5, 0.7],
-    "high": [0.7, 0.9]
+    "very_low": [0.0, 0.2],
+    "low": [0.2, 0.4],
+    "mid": [0.4, 0.6],
+    "high": [0.6, 0.8],
+    "very_high": [0.8, 1.0]
   },
   
   "training_conditions": [
-    {"id": 0,  "game": "prisoners-dilemma", "opponent_range": "low",      "opponents": [0.1, 0.3]},
-    {"id": 1,  "game": "prisoners-dilemma", "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
-    {"id": 2,  "game": "prisoners-dilemma", "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
-    {"id": 3,  "game": "prisoners-dilemma", "opponent_range": "high",     "opponents": [0.7, 0.9]},
-    {"id": 4,  "game": "hawk-dove",         "opponent_range": "low",      "opponents": [0.1, 0.3]},
-    {"id": 5,  "game": "hawk-dove",         "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
-    {"id": 6,  "game": "hawk-dove",         "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
-    {"id": 7,  "game": "hawk-dove",         "opponent_range": "high",     "opponents": [0.7, 0.9]},
-    {"id": 8,  "game": "stag-hunt",         "opponent_range": "low",      "opponents": [0.1, 0.3]},
-    {"id": 9,  "game": "stag-hunt",         "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
-    {"id": 10, "game": "stag-hunt",         "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
-    {"id": 11, "game": "stag-hunt",         "opponent_range": "high",     "opponents": [0.7, 0.9]}
+    {"id": 0,  "game": "prisoners-dilemma", "opponent_range": "very_low",  "opponents": [0.0, 0.2]},
+    {"id": 1,  "game": "prisoners-dilemma", "opponent_range": "low",       "opponents": [0.2, 0.4]},
+    {"id": 2,  "game": "prisoners-dilemma", "opponent_range": "mid",       "opponents": [0.4, 0.6]},
+    {"id": 3,  "game": "prisoners-dilemma", "opponent_range": "high",      "opponents": [0.6, 0.8]},
+    {"id": 4,  "game": "prisoners-dilemma", "opponent_range": "very_high", "opponents": [0.8, 1.0]},
+    {"id": 5,  "game": "hawk-dove",         "opponent_range": "very_low",  "opponents": [0.0, 0.2]},
+    {"id": 6,  "game": "hawk-dove",         "opponent_range": "low",       "opponents": [0.2, 0.4]},
+    {"id": 7,  "game": "hawk-dove",         "opponent_range": "mid",       "opponents": [0.4, 0.6]},
+    {"id": 8,  "game": "hawk-dove",         "opponent_range": "high",      "opponents": [0.6, 0.8]},
+    {"id": 9,  "game": "hawk-dove",         "opponent_range": "very_high", "opponents": [0.8, 1.0]},
+    {"id": 10, "game": "stag-hunt",         "opponent_range": "very_low",  "opponents": [0.0, 0.2]},
+    {"id": 11, "game": "stag-hunt",         "opponent_range": "low",       "opponents": [0.2, 0.4]},
+    {"id": 12, "game": "stag-hunt",         "opponent_range": "mid",       "opponents": [0.4, 0.6]},
+    {"id": 13, "game": "stag-hunt",         "opponent_range": "high",      "opponents": [0.6, 0.8]},
+    {"id": 14, "game": "stag-hunt",         "opponent_range": "very_high", "opponents": [0.8, 1.0]}
   ],
   
   "test_conditions": {
@@ -49,7 +53,8 @@
     "batch_size": 32,
     "max_epochs": 500,
     "convergence_threshold": 1e-6,
-    "patience": 50
+    "patience": 50,
+    "checkpoint_frequency": 100
   },
   
   "evaluation_config": {
@@ -58,8 +63,8 @@
   },
   
   "slurm_config": {
-    "total_tasks": 16,
-    "task_id_range": "0-15",
+    "total_tasks": 15,
+    "task_id_range": "0-14",
     "estimated_time_per_task": "2:00:00",
     "memory_per_task": "8G"
   }

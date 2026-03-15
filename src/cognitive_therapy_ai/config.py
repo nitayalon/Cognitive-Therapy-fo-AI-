@@ -34,6 +34,7 @@ class TrainingConfig:
     max_epochs: int = 2000
     convergence_threshold: float = 1e-4
     patience: int = 100  # Early stopping patience
+    checkpoint_frequency: int = 100  # Save network weights every N epochs
     
     # Loss function weights
     reward_loss_weight: float = 1.0

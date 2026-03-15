@@ -11,6 +11,7 @@
     "max_epochs": 500,
     "convergence_threshold": 1e-6,
     "patience": 50,
+    "checkpoint_frequency": 100,
     "reward_loss_weight": 1.0,
     "action_prediction_loss_weight": 1.0,
     "type_prediction_loss_weight": 1.0
