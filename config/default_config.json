@@ -16,7 +16,7 @@
     "type_prediction_loss_weight": 1.0
   },
   "experiment_config": {
-    "opponent_defection_probs": [0.1, 0.3, 0.5, 0.7, 0.9],
+    "opponent_defection_probs": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
     "random_seed": 42,
     "save_checkpoints": true,
     "checkpoint_dir": "checkpoints",
@@ -32,11 +32,6 @@
       "R": 3.0,
       "P": 1.0,
       "S": 0.0
-    },
-    "battle-of-sexes": {
-      "player_preferred": 3.0,
-      "player_dispreferred": 2.0,
-      "miscoordination": 0.0
     },
     "stag-hunt": {
       "stag_payoff": 4.0,

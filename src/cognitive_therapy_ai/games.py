@@ -203,48 +203,6 @@ class PrisonersDilemma(MixedMotiveGame):
         ], dtype=np.float32)
 
 
-class BattleOfSexes(MixedMotiveGame):
-    """
-    Battle of the Sexes implementation.
-    
-    Coordination game where players prefer to coordinate but disagree
-    on which outcome to coordinate on.
-    """
-    
-    def __init__(self, player_preferred: float = 3.0, player_dispreferred: float = 2.0, 
-                 miscoordination: float = 0.0):
-        """
-        Initialize Battle of the Sexes.
-        
-        Args:
-            player_preferred: Payoff when coordinating on player's preferred outcome
-            player_dispreferred: Payoff when coordinating on opponent's preferred outcome  
-            miscoordination: Payoff when failing to coordinate
-        """
-        super().__init__("Battle-of-Sexes")
-        self.player_preferred = player_preferred
-        self.player_dispreferred = player_dispreferred
-        self.miscoordination = miscoordination
-    
-    def get_payoff_matrix(self) -> np.ndarray:
-        """
-        Payoff matrix for Battle of the Sexes.
-        
-        In this interpretation:
-        - Cooperate = Player's preferred choice
-        - Defect = Opponent's preferred choice
-        
-        Returns:
-            2x2 numpy array where matrix[i][j] is payoff for action i against action j
-        """
-        # Rows: player actions (Player's pref, Opponent's pref)
-        # Cols: opponent actions (Player's pref, Opponent's pref)
-        return np.array([
-            [self.player_preferred, self.miscoordination],      # Player's pref vs [Player's pref, Opponent's pref]
-            [self.miscoordination, self.player_dispreferred]    # Opponent's pref vs [Player's pref, Opponent's pref]
-        ], dtype=np.float32)
-
-
 class StagHunt(MixedMotiveGame):
     """
     Stag Hunt Game implementation.
@@ -318,7 +276,6 @@ class GameFactory:
         game_classes = {
             'hawk-dove': HawkDove,
             'prisoners-dilemma': PrisonersDilemma,
-            'battle-of-sexes': BattleOfSexes,
             'stag-hunt': StagHunt
         }
         
@@ -330,4 +287,4 @@ class GameFactory:
     @staticmethod
     def get_available_games() -> List[str]:
         """Get list of available game names."""
-        return ['hawk-dove', 'prisoners-dilemma', 'battle-of-sexes', 'stag-hunt']
+        return ['hawk-dove', 'prisoners-dilemma', 'stag-hunt']

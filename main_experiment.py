@@ -115,14 +115,14 @@ def parse_arguments():
         '--training-games', 
         type=str, 
         default='prisoners-dilemma,hawk-dove',
-        help='Comma-separated list of games to train on (e.g., "prisoners-dilemma,hawk-dove,battle-of-sexes")'
+        help='Comma-separated list of games to train on (e.g., "prisoners-dilemma,hawk-dove,stag-hunt")'
     )
     
     parser.add_argument(
         '--test-game', 
         type=str, 
         default='hawk-dove',
-        help='Game to test the trained agent on (single game name from: hawk-dove, prisoners-dilemma, battle-of-sexes, stag-hunt)'
+        help='Game to test the trained agent on (single game name from: hawk-dove, prisoners-dilemma, stag-hunt)'
     )
 
     parser.add_argument(
@@ -1391,7 +1391,7 @@ def main():
     logger.info(f"Arguments: {vars(args)}")
     
     # Validate games
-    valid_games = ['hawk-dove', 'prisoners-dilemma', 'battle-of-sexes', 'stag-hunt']
+    valid_games = ['hawk-dove', 'prisoners-dilemma', 'stag-hunt']
     
     # Parse training games and test game for multi-game modes
     training_games = [game.strip() for game in args.training_games.split(',')]

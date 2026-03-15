@@ -2,8 +2,8 @@
 
 **Version**: 1.0  
 **Date**: March 11, 2026  
-**Prepared for**: New collaborators
-
+**Prepared for**: Joe Barnby
+ and Sep Razavi
 ## 📋 Quick Overview
 
 This repository investigates how RL agents generalize (or fail to generalize) in social games, comparing **Vanilla RL** vs. **Theory of Mind RL (ToM-RL)** architectures across different game structures and opponent types.

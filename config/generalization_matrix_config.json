@@ -5,8 +5,7 @@
   "games": [
     "prisoners-dilemma",
     "hawk-dove", 
-    "stag-hunt",
-    "battle-of-sexes"
+    "stag-hunt"
   ],
   
   "opponent_ranges": {
@@ -28,11 +27,7 @@
     {"id": 8,  "game": "stag-hunt",         "opponent_range": "low",      "opponents": [0.1, 0.3]},
     {"id": 9,  "game": "stag-hunt",         "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
     {"id": 10, "game": "stag-hunt",         "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
-    {"id": 11, "game": "stag-hunt",         "opponent_range": "high",     "opponents": [0.7, 0.9]},
-    {"id": 12, "game": "battle-of-sexes",   "opponent_range": "low",      "opponents": [0.1, 0.3]},
-    {"id": 13, "game": "battle-of-sexes",   "opponent_range": "mid_low",  "opponents": [0.3, 0.5]},
-    {"id": 14, "game": "battle-of-sexes",   "opponent_range": "mid_high", "opponents": [0.5, 0.7]},
-    {"id": 15, "game": "battle-of-sexes",   "opponent_range": "high",     "opponents": [0.7, 0.9]}
+    {"id": 11, "game": "stag-hunt",         "opponent_range": "high",     "opponents": [0.7, 0.9]}
   ],
   
   "test_conditions": {

@@ -18,7 +18,7 @@ def test_imports():
     print("Testing imports...")
     
     try:
-        from cognitive_therapy_ai.games import HawkDove, PrisonersDilemma, BattleOfSexes, StagHunt, GameFactory
+        from cognitive_therapy_ai.games import HawkDove, PrisonersDilemma, StagHunt, GameFactory
         from cognitive_therapy_ai.opponent import Opponent, OpponentFactory
         from cognitive_therapy_ai.network import GameLSTM, NetworkManager
         from cognitive_therapy_ai.trainer import GameTrainer, GameSession
@@ -43,7 +43,7 @@ def test_games():
         games = [
             GameFactory.create_game('hawk-dove'),
             GameFactory.create_game('prisoners-dilemma'),  
-            GameFactory.create_game('battle-of-sexes'),
+
             GameFactory.create_game('stag-hunt')
         ]
         

@@ -19,7 +19,6 @@ Training conditions are defined in `config/generalization_matrix_config.json`:
 1. Prisoner's Dilemma (prisoners-dilemma)
 2. Hawk-Dove (hawk-dove)  
 3. Stag Hunt (stag-hunt)
-4. Battle of Sexes (battle-of-sexes)
 
 ### Opponent Ranges:
 1. **Low defection:** [0.1, 0.2, 0.3, 0.4]
@@ -79,7 +78,6 @@ experiments/vanilla_rl_array_<JOB_ID>_<TIMESTAMP>/
 │   │   ├── eval_same_game_high/
 │   │   ├── eval_hawk-dove_same_opponents/
 │   │   ├── eval_stag-hunt_same_opponents/
-│   │   ├── eval_battle-of-sexes_same_opponents/
 │   │   └── eval_<game>_<opponent_range>/  # Cross-generalization
 │   ├── plots/
 │   ├── results/

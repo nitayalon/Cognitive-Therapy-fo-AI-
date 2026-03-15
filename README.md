@@ -28,16 +28,15 @@ We compare two architectures:
 
 ## 🎮 Mixed-Motive Games
 
-The framework supports four classic game-theoretic environments:
+The framework supports three classic game-theoretic environments:
 
 | Game | Description | Key Parameters |
 |------|-------------|----------------|
 | **Prisoner's Dilemma** | Cooperation vs. defection dilemma | R=3, T=5, S=0, P=1 |
 | **Hawk-Dove** | Resource competition with conflict costs | V=4, C=6 |
 | **Stag Hunt** | Coordination with security dilemma | Stag=5, Hare=3 |
-| **Battle of Sexes** | Conflicting coordination preferences | A=3, B=2, C=1 |
 
-Each game presents different strategic challenges: from pure competition (Prisoner's Dilemma) to complex coordination (Battle of Sexes).
+Each game presents different strategic challenges: from pure competition (Prisoner's Dilemma) to coordination dilemmas (Stag Hunt).
 
 ## 🧠 ToM-RL Architecture
 
@@ -215,9 +214,9 @@ Cognitive-Therapy-fo-AI-/
 
 #### 1. Generalization Matrix Study
 **Location**: `experiments/generalization_matrix_*/`
-- **Design**: Train on each of 4 games, test on all 4 games
+- **Design**: Train on each of 3 games, test on all 3 games (3×3 matrix)
 - **Opponents**: 5 types per game (defection probabilities: 0.1, 0.3, 0.5, 0.7, 0.9)
-- **Output**: 16 train-test combinations (4×4 matrix)
+- **Output**: 9 train-test combinations (3×3 matrix)
 - **Key Metrics**: Cross-game generalization error, cooperation rates, opponent prediction accuracy
 
 #### 2. Vanilla RL Baseline

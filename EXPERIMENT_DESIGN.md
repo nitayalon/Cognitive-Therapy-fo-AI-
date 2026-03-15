@@ -114,7 +114,6 @@ L_proto-ToM = LRL_norm + α * LOp_action_norm + β * LOp_reward_norm
 1. **Prisoner's Dilemma**: Classic cooperation dilemma (dominant defection)
 2. **Hawk-Dove**: Resource competition with costly conflict
 3. **Stag Hunt**: Coordination with risk (assurance game)
-4. **Battle of the Sexes**: Coordination with preference conflict
 
 ---
 
@@ -198,28 +197,30 @@ L_proto-ToM = LRL_norm + α * LOp_action_norm + β * LOp_reward_norm
 
 ### 5.0 Experimental Paradigm: Two-Agent Comparison
 
-**Core Design**: Each training condition is run with **both agent types**:
+**Core Design**: Each training condition is run with **both agent types** and **multiple seeds**:
 
 1. **Vanilla RL Agent**: Trained only to maximize reward (baseline)
 2. **Proto-ToM Agent**: Trained with reward maximization + social auxiliary tasks
 
-**Comparison Structure**:
+**Replication Structure**:
 ```
 For each training condition (game × opponent_range):
-    Train Vanilla Agent → Test on all 16 conditions → Measure generalization
-    Train Proto-ToM Agent → Test on all 16 conditions → Measure generalization
-    Compare: Vanilla vs Proto-ToM performance across test conditions
+    For each seed in [42, 52, 62, 72, 82]:
+        Train Vanilla Agent → Test on all 15 conditions → Measure generalization
+        Train Proto-ToM Agent → Test on all 15 conditions → Measure generalization
+        Compare: Vanilla vs Proto-ToM performance
 ```
 
 **Result**: 
-- 16 training conditions × 2 agent types = **32 trained agents**
-- 32 agents × 16 test conditions = **512 generalization measurements**
-- Direct comparison of vanilla vs proto-ToM generalization patterns
+- 15 training conditions × 2 agent types × 5 seeds = **150 trained agents**
+- 150 agents × 15 test conditions = **2,250 generalization measurements**
+- 5 independent samples per (agent_type, training_condition, test_condition) triplet
+- Direct comparison of vanilla vs proto-ToM generalization patterns with statistical power
 
 ### 5.1 Training Phase: Single-Game, Single-Opponent-Range
 
 **Training Paradigm**:
-- **Single Game**: One game from {Prisoner's Dilemma, Hawk-Dove, Stag Hunt, Battle of Sexes}
+- **Single Game**: One game from {Prisoner's Dilemma, Hawk-Dove, Stag Hunt}
 - **Single Opponent Range**: Fixed probability range (e.g., [0.1, 0.3] = low cooperation opponents)
 - **Session Structure**: T consecutive games with same opponent (T = 100 default)
 - **LSTM State**: Persists across all T games within session, resets between opponents
@@ -258,32 +259,44 @@ For each epoch:
 
 ### 5.3 Generalization Matrix: Full Factorial Design
 
-**Matrix Structure**: 4 Games × 4 Opponent Ranges = 16 Training Conditions
+**Matrix Structure**: 3 Games × 5 Opponent Ranges = 15 Training Conditions
 
 **Games**:
 1. Prisoner's Dilemma (PD)
 2. Hawk-Dove (HD)
 3. Stag Hunt (SH)
-4. Battle of Sexes (BoS)
 
 **Opponent Ranges**:
-1. Low cooperation: [0.1, 0.3]
-2. Mid-low cooperation: [0.3, 0.5]
-3. Mid-high cooperation: [0.5, 0.7]
-4. High cooperation: [0.7, 0.9]
+1. Very low defection: [0.0, 0.2]
+2. Low defection: [0.2, 0.4]
+3. Mid defection: [0.4, 0.6]
+4. High defection: [0.6, 0.8]
+5. Very high defection: [0.8, 1.0]
 
-**Training Conditions** (each gets one agent):
+**Multi-Seed Replication**:
+- **5 random seeds per condition** (seeds: 42, 52, 62, 72, 82)
+- Seeds spaced by 10 to ensure independence
+- Enables statistical testing with confidence intervals
+- Distinguishes systematic patterns from random variation
+- Total: 15 conditions × 5 seeds = **75 independent training runs**
+
+**Training Conditions** (15 total, each replicated 5 times):
 ```
-Condition  0: PD  + Low      → Test on all 16 game-opponent combinations
-Condition  1: PD  + Mid-Low  → Test on all 16 game-opponent combinations
-Condition  2: PD  + Mid-High → Test on all 16 game-opponent combinations
-Condition  3: PD  + High     → Test on all 16 game-opponent combinations
-Condition  4: HD  + Low      → Test on all 16 game-opponent combinations
+Condition  0: PD + very_low  → 5 seeds → Test on all 15 conditions
+Condition  1: PD + low       → 5 seeds → Test on all 15 conditions
+Condition  2: PD + mid       → 5 seeds → Test on all 15 conditions
+Condition  3: PD + high      → 5 seeds → Test on all 15 conditions
+Condition  4: PD + very_high → 5 seeds → Test on all 15 conditions
+Condition  5: HD + very_low  → 5 seeds → Test on all 15 conditions
 ...
-Condition 15: BoS + High     → Test on all 16 game-opponent combinations
+Condition 14: SH + very_high → 5 seeds → Test on all 15 conditions
 ```
 
-**Result**: 16 agents × 16 test conditions = 256 generalization measurements
+**Result**: 
+- 75 trained agents (15 conditions × 5 seeds)
+- 75 agents × 15 test conditions = **1,125 generalization measurements**
+- 5 independent samples per (training_condition, test_condition) pair
+- Sufficient for statistical inference with confidence intervals
 
 ### 5.4 Opponent Model
 
@@ -610,13 +623,11 @@ Reward_Error = MSE(predicted_opponent_rewards, actual_opponent_rewards)
 **Game Difficulty Ranking** (predicted learning speed):
 1. **Prisoner's Dilemma**: Simplest (dominant strategy)
 2. **Hawk-Dove**: Moderate (anti-coordination)
-3. **Battle of Sexes**: Complex (coordination with conflict)
-4. **Stag Hunt**: Complex (multiple equilibria, risk-dominance)
+3. **Stag Hunt**: Complex (multiple equilibria, risk-dominance)
 
 **Transfer Matrix Predictions**:
-- **Within coordination games**: BoS ↔ Stag Hunt should transfer well
 - **Within conflict games**: PD ↔ Hawk-Dove moderate transfer
-- **Cross-category**: Coordination → Conflict games should be hardest
+- **Cross-category**: Coordination (Stag Hunt) → Conflict games should be challenging
 
 **Proto-ToM Effect**: Should reduce game transfer difficulty by learning generalizable incentive structures
 
@@ -858,12 +869,19 @@ for training_condition in all_training_conditions:
     "batch_size": 32,
     "max_epochs": 500,
     "convergence_threshold": 1e-6,
-    "patience": 50
+    "patience": 50,
+    "checkpoint_frequency": 100
   },
   "experiment_config": {
     "opponent_defection_probs": [0.1, 0.3, 0.5, 0.7, 0.9],
     "random_seed": 42,
     "save_checkpoints": true
+  },
+  "replication": {
+    "num_seeds": 5,
+    "seed_base": 42,
+    "seed_gap": 10,
+    "seeds": [42, 52, 62, 72, 82]
   },
   "games": {
     "game-name": {"parameter": value}
@@ -871,24 +889,78 @@ for training_condition in all_training_conditions:
 }
 ```
 
+**Seed Management**:
+- **Single run**: Use `--seed 42` flag
+- **Multi-seed experiments**: Handled by SLURM nested array structure
+- **Seed documentation**: Auto-generated manifest files track all seeds
+- **Reproducibility**: Each manifest contains complete configuration snapshot
+
 ### 10.3 Experiment Modes
 
 **Mode 1: Basic (Recommended) - Two Agent Comparison**
 ```bash
-# Train and test both agent types
+# Train and test both agent types with specific seed
 python main_experiment.py --experiment-mode basic \
     --agent-types vanilla,proto-tom \
     --train-game prisoners-dilemma --train-opponents 0.1,0.3 \
-    --test-game hawk-dove --test-opponents 0.7,0.9
+    --test-game hawk-dove --test-opponents 0.7,0.9 \
+    --seed 42
 ```
 
-**Mode 2: Generalization Matrix (SLURM Array Jobs) - Both Agents**
+**Mode 2: Generalization Matrix (SLURM Array Jobs) - Multi-Seed Nested Arrays**
 ```bash
-# Each task trains both vanilla and proto-ToM agents
-python main_experiment.py --experiment-mode generalization-matrix \
-    --agent-types vanilla,proto-tom \
-    --task-id $SLURM_ARRAY_TASK_ID \
-    --matrix-config config/generalization_matrix_config.json
+# Submit full experiment: 15 conditions × 5 seeds × 2 agent types
+# Total: 150 array tasks (75 tasks × 2 agent types need separate submission)
+
+# Submit vanilla agents (75 tasks)
+sbatch --array=0-74 run_generalization_matrix.sh
+
+# Submit proto-ToM agents (75 tasks) 
+sbatch --array=0-74 run_generalization_matrix.sh --agent-type proto-tom
+```
+
+**Nested Array Structure**:
+```python
+# Task ID mapping (implemented in SLURM script)
+NUM_SEEDS = 5
+SEED_BASE = 42
+
+CONDITION_ID = TASK_ID // NUM_SEEDS  # 0-14
+SEED_ID = TASK_ID % NUM_SEEDS        # 0-4
+SEED = SEED_BASE + SEED_ID           # 42-46
+
+# Examples:
+# Task 0:  Condition 0 (PD+very_low), seed 42
+# Task 1:  Condition 0 (PD+very_low), seed 43
+# Task 5:  Condition 1 (PD+low), seed 42
+# Task 74: Condition 14 (SH+very_high), seed 46
+```
+
+**Seed Manifest Files** (auto-generated):
+```
+experiments/generalization_matrix_{JOB_ID}/
+├── seed_manifests/
+│   ├── MASTER_SEED_REGISTRY.csv        # All tasks in one CSV
+│   ├── task_0_manifest.txt             # Detailed info per task
+│   ├── task_1_manifest.txt
+│   └── ...
+```
+
+**Decoding and Validation**:
+```bash
+# Decode a specific task ID
+python decode_seed_manifest.py --task-id 37
+
+# View all task mappings
+python decode_seed_manifest.py --all
+
+# Validate completed jobs
+python decode_seed_manifest.py --validate \
+    experiments/generalization_matrix_12345/seed_manifests/MASTER_SEED_REGISTRY.csv
+
+# Generate resubmission script for failed jobs
+python decode_seed_manifest.py --check-missing \
+    experiments/generalization_matrix_12345/seed_manifests/MASTER_SEED_REGISTRY.csv
 ```
 
 **Mode 3: Single Agent Type Testing**
@@ -896,7 +968,8 @@ python main_experiment.py --experiment-mode generalization-matrix \
 # Train only vanilla or only proto-ToM for ablation studies
 python main_experiment.py --experiment-mode basic \
     --agent-types vanilla \
-    --train-game prisoners-dilemma --train-opponents 0.1,0.3
+    --train-game prisoners-dilemma --train-opponents 0.1,0.3 \
+    --seed 42
 ```
 
 ### 10.4 Output Structure
