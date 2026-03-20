@@ -652,36 +652,20 @@ Reward_Error = MSE(predicted_opponent_rewards, actual_opponent_rewards)
 ### 9.1 Training Phase Analysis
 
 **Training Convergence Comparison**:
-- Learning curves per training condition (vanilla vs proto-ToM)
+- Learning curves per training condition:
+    - For each setting compute the optimal policy (pure or mixed Nash) and then show the time (epohcs on x-axis) until convergence to this policy
 - Convergence speed: epochs to reach threshold
 - Final loss values: total loss comparison between agent types
 - Training stability: loss variance across epochs
-
-**Proto-ToM Agent Auxiliary Task Development**:
-- Opponent action prediction accuracy trajectory over training
-- Opponent reward prediction error reduction over training  
-- Loss component balance: relative magnitudes of LRL, LOp_action, LOp_reward
-- Correlation between auxiliary task performance and main task rewards
-
-**Training Cost Analysis**:
-- Computational time per epoch (vanilla vs proto-ToM)
-- Memory requirements comparison
-- Convergence efficiency (performance per epoch)
 
 ### 9.2 Generalization Analysis
 
 **Primary Comparisons**:
 
-1. **Agent Type Main Effect**:
-   - Two-way ANOVA: agent_type (vanilla/proto-ToM) × test_condition
-   - Main effect of agent_type on generalization error
-   - Post-hoc tests for each test condition separately
-
-2. **Generalization Matrix Visualization**:
-   - **Two 16×16 heatmaps**: One for vanilla, one for proto-ToM
-   - Rows: Training conditions, Columns: Test conditions
-   - Metrics: Reward, cooperation rate, (proto-ToM only: prediction accuracies)
-   - **Difference heatmap**: Proto-ToM − Vanilla performance
+1. **Generalization Matrix Visualization**:
+   - **Two 5×3x16 heatmaps**: One for each training setup
+   - Rows: Opponnent's prosociality, Columns: Tasks
+   - Metrics: Normalized reward (train setting is set to zero - evrything is relative), cooperation rate
 
 3. **Condition-Specific Analysis**:
    - **Same-game/new-opponents**: Opponent generalization ability

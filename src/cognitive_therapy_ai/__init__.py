@@ -8,7 +8,7 @@ to study representation changes as a function of training data and opponent beha
 __version__ = "0.1.0"
 __author__ = "Your Name"
 
-from .games import HawkDove, PrisonersDilemma, BattleOfSexes, StagHunt, GameFactory, MixedMotiveGame
+from .games import HawkDove, PrisonersDilemma, StagHunt, GameFactory, MixedMotiveGame
 from .opponent import Opponent, OpponentFactory
 from .network import GameLSTM
 from .trainer import GameTrainer
@@ -17,8 +17,7 @@ from .training_monitor import TrainingMonitor, BatchedTrainingMonitor
 
 __all__ = [
     "HawkDove",
-    "PrisonersDilemma", 
-    "BattleOfSexes",
+    "PrisonersDilemma",
     "StagHunt",
     "GameFactory",
     "MixedMotiveGame",

@@ -5,8 +5,7 @@
 #SBATCH -D ./
 #
 # Queue (Partition):
-#SBATCH --partition=gpu # nyx partitions: compute, highmem, gpu
-#SBATCH --gres=gpu:1
+#SBATCH --partition=highmem # nyx partitions: compute, highmem, gpu
 #
 # Number of nodes and MPI tasks per node:
 #SBATCH --cpus-per-task=4
@@ -23,12 +22,12 @@
 # 
 # NESTED ARRAY STRUCTURE:
 # - 15 training conditions (3 games × 5 opponent ranges)
-# - 5 random seeds per condition
+# - 5 random seeds per condition (run_id 0-4)
 # - Total: 75 array tasks (0-74)
 #
 # Task ID Mapping:
-#   CONDITION_ID = TASK_ID / 5  (integer division)
-#   SEED_ID = TASK_ID % 5       (modulo)
+#   CONDITION_ID = TASK_ID / 5  (integer division) -> becomes --task-id
+#   SEED_ID = TASK_ID % 5       (modulo)           -> becomes --run-id
 #   SEED = 42 + SEED_ID * 10    (seeds: 42, 52, 62, 72, 82)
 #
 # Training Conditions (15 total):
@@ -37,17 +36,17 @@
 #   Conditions 10-14: Stag-Hunt × [very_low, low, mid, high, very_high]
 #
 # Example Task Mapping:
-#   Task 0-4:   PD+very_low with seeds 42,52,62,72,82
-#   Task 5-9:   PD+low with seeds 42,52,62,72,82
-#   Task 10-14: PD+mid with seeds 42,52,62,72,82
+#   Task 0-4:   PD+very_low with run_ids 0-4 (seeds 42,52,62,72,82)
+#   Task 5-9:   PD+low with run_ids 0-4 (seeds 42,52,62,72,82)
+#   Task 10-14: PD+mid with run_ids 0-4 (seeds 42,52,62,72,82)
 #   ...
-#   Task 70-74: SH+very_high with seeds 42,52,62,72,82
+#   Task 70-74: SH+very_high with run_ids 0-4 (seeds 42,52,62,72,82)
 #
 # Each task trains on one (game, opponent_range, seed) combination and tests on:
 #   - Same game, same opponents (in-distribution baseline)
-#   - Same game, new opponents (opponent generalization)
-#   - New game, same opponents (game structure generalization)
-#   - New game, new opponents (full out-of-distribution)
+#   - Same game, all other opponent ranges (opponent generalization)
+#   - New games, same opponents (game structure generalization)
+#   - New games, all other opponent ranges (full out-of-distribution)
 
 module purge
 module load singularity
@@ -110,9 +109,9 @@ GENERALIZATION MATRIX - SEED MANIFEST
 ========================================
 Array Job ID:        ${SLURM_ARRAY_JOB_ID}
 Array Task ID:       ${SLURM_ARRAY_TASK_ID}
-Condition ID:        ${CONDITION_ID}
-Seed ID:             ${SEED_ID}
-Random Seed:         ${SEED}
+Condition ID:        ${CONDITION_ID} (--task-id)
+Seed ID / Run ID:    ${SEED_ID} (--run-id)
+Random Seed:         ${SEED} (--seed)
 ----------------------------------------
 Job Name:            ${SLURM_JOB_NAME}
 Node:                ${SLURM_NODELIST}
@@ -133,9 +132,9 @@ echo "=========================================="
 echo "ARRAY TASK MAPPING:"
 echo "  Array Job ID: $SLURM_ARRAY_JOB_ID"
 echo "  Array Task ID: $SLURM_ARRAY_TASK_ID"
-echo "  -> Condition ID: $CONDITION_ID (of 15)"
-echo "  -> Seed ID: $SEED_ID (of 5)"
-echo "  -> Random Seed: $SEED"
+echo "  -> Condition ID: $CONDITION_ID (of 15) [--task-id]"
+echo "  -> Seed ID: $SEED_ID (of 5) [--run-id]"
+echo "  -> Random Seed: $SEED [--seed]"
 echo "=========================================="
 echo "JOB DETAILS:"
 echo "  Job Name: $SLURM_JOB_NAME"
@@ -154,12 +153,13 @@ echo "=========================================="
 time singularity exec ${CONTAINER_PATH} python main_experiment.py \
     --experiment-mode generalization-matrix \
     --task-id ${CONDITION_ID} \
+    --run-id ${SEED_ID} \
     --matrix-config "$MATRIX_CONFIG" \
     --max-epochs "$MAX_EPOCHS" \
     --num-games "$NUM_GAMES" \
     --output-dir "$ARRAY_OUTPUT_DIR" \
     --seed ${SEED} \
-    --adaptive-loss \
+    --agent-type vanilla \
     --device auto \
     --verbose
 
@@ -183,7 +183,8 @@ echo "=========================================="
 echo "TASK COMPLETED"
 echo "=========================================="
 echo "  Array Task ID: $SLURM_ARRAY_TASK_ID"
-echo "  Condition ID: $CONDITION_ID"
+echo "  Condition ID: $CONDITION_ID (task-id)"
+echo "  Run ID: $SEED_ID (run-id)"
 echo "  Seed: $SEED"
 echo "  End Time: $(date)"
 echo "  Exit Status: $EXIT_STATUS"

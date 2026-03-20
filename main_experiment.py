@@ -92,6 +92,13 @@ def parse_arguments():
     )
     
     parser.add_argument(
+        '--run-id',
+        type=int,
+        default=None,
+        help='Run ID for multiple runs of the same task with different seeds. If provided, seed = base_seed + run_id.'
+    )
+    
+    parser.add_argument(
         '--matrix-config',
         type=str,
         default='config/generalization_matrix_config.json',
@@ -926,37 +933,35 @@ def run_generalization_matrix_experiment(
         }
         evaluation_summaries[condition_key] = summarize_evaluation_results(results)
     
-    # 4. Different game, different opponents (sample key combinations for preliminary results)
-    # Test each other game with ONE different opponent range (to limit computation)
+    # 4. Different game, different opponents (test ALL combinations for complete generalization matrix)
+    # Test each other game with ALL opponent ranges (except same opponents already tested in section 3)
     for other_game in other_games:
         other_game_instance = GameFactory.create_game(other_game)
         
-        # Pick the "opposite" opponent range for maximum contrast
-        if train_opponent_range in ['low', 'mid_low']:
-            test_range = 'high'
-        else:
-            test_range = 'low'
+        # Test with all opponent ranges EXCEPT the training range (already tested in section 3)
+        test_ranges = [r for r in opponent_ranges.keys() if r != train_opponent_range]
         
-        test_probs = opponent_ranges[test_range]
-        test_opponents = OpponentFactory.create_opponent_set(test_probs)
-        
-        condition_key = f"{other_game}_{test_range}"
-        logger.info(f"Evaluating: {other_game} + {test_range} (cross-generalization)")
-        
-        results = trainer.evaluate(
-            game=other_game_instance,
-            opponents=test_opponents,
-            num_sessions=num_sessions,
-            enable_detailed_testing=enable_detailed,
-            testing_log_dir=os.path.join(output_dirs['logs'], f'eval_{condition_key}')
-        )
-        evaluation_results[condition_key] = {
-            'condition': 'new_game_new_opponents',
-            'game': other_game,
-            'opponent_range': test_range,
-            'results': results
-        }
-        evaluation_summaries[condition_key] = summarize_evaluation_results(results)
+        for test_range in test_ranges:
+            test_probs = opponent_ranges[test_range]
+            test_opponents = OpponentFactory.create_opponent_set(test_probs)
+            
+            condition_key = f"{other_game}_{test_range}"
+            logger.info(f"Evaluating: {other_game} + {test_range} (cross-generalization)")
+            
+            results = trainer.evaluate(
+                game=other_game_instance,
+                opponents=test_opponents,
+                num_sessions=num_sessions,
+                enable_detailed_testing=enable_detailed,
+                testing_log_dir=os.path.join(output_dirs['logs'], f'eval_{condition_key}')
+            )
+            evaluation_results[condition_key] = {
+                'condition': 'new_game_new_opponents',
+                'game': other_game,
+                'opponent_range': test_range,
+                'results': results
+            }
+            evaluation_summaries[condition_key] = summarize_evaluation_results(results)
     
     # === COMPUTE GENERALIZATION ERRORS ===
     baseline_summary = evaluation_summaries['baseline']
@@ -1360,8 +1365,15 @@ def main():
     """Main experiment function."""
     args = parse_arguments()
     
-    # Set random seed
-    set_random_seeds(args.seed)
+    # Set random seed (adjust for run_id if provided)
+    if args.run_id is not None:
+        actual_seed = args.seed + args.run_id
+        logger_seed_msg = f"Base seed: {args.seed}, Run ID: {args.run_id}, Actual seed: {actual_seed}"
+    else:
+        actual_seed = args.seed
+        logger_seed_msg = f"Seed: {actual_seed}"
+    
+    set_random_seeds(actual_seed)
     
     # Setup device
     device = setup_device(args.device)
@@ -1377,7 +1389,10 @@ def main():
             experiment_name = f"segmented_experiment_{timestamp}"
         elif args.experiment_mode == 'generalization-matrix':
             task_id = args.task_id if args.task_id is not None else 0
-            experiment_name = f"generalization_matrix_task_{task_id}_{timestamp}"
+            if args.run_id is not None:
+                experiment_name = f"generalization_matrix_task_{task_id}_run_{args.run_id}_{timestamp}"
+            else:
+                experiment_name = f"generalization_matrix_task_{task_id}_{timestamp}"
         else:
             experiment_name = f"mixed_motive_experiment_{timestamp}"
     output_dirs = create_output_dirs(args.output_dir, experiment_name)
@@ -1389,6 +1404,7 @@ def main():
     
     logger.info("Starting Mixed-Motive Game Experiment")
     logger.info(f"Arguments: {vars(args)}")
+    logger.info(logger_seed_msg)
     
     # Validate games
     valid_games = ['hawk-dove', 'prisoners-dilemma', 'stag-hunt']
@@ -1442,7 +1458,7 @@ def main():
     )
     experiment_config = ExperimentConfig(
         opponent_defection_probs=opponent_probs,
-        random_seed=args.seed
+        random_seed=actual_seed  # Use actual seed (adjusted for run_id)
     )
     
     # Save configurations
@@ -1457,6 +1473,11 @@ def main():
         'opponent_probabilities': opponent_probs,
         'train_opponent_probabilities': train_opponent_probs,
         'test_opponent_probabilities': test_opponent_probs,
+        'seed_info': {
+            'base_seed': args.seed,
+            'run_id': args.run_id,
+            'actual_seed': actual_seed
+        },
         'args': vars(args)
     }
     
