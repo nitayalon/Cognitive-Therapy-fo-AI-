@@ -248,6 +248,28 @@ def parse_arguments():
         help='Agent type: vanilla (reward-only baseline) or proto-tom (with opponent modeling)'
     )
     
+    parser.add_argument(
+        '--mode',
+        type=str,
+        choices=['full', 'train-only', 'eval-only'],
+        default='full',
+        help='Execution mode: full (train+test), train-only (save checkpoint), eval-only (load checkpoint)'
+    )
+    
+    parser.add_argument(
+        '--checkpoint-path',
+        type=str,
+        default=None,
+        help='Path to checkpoint file (required for eval-only mode)'
+    )
+    
+    parser.add_argument(
+        '--test-condition-ids',
+        type=str,
+        default=None,
+        help='Comma-separated test condition IDs for eval-only mode (e.g., "0,1,2" or "all" for all except training)'
+    )
+    
     return parser.parse_args()
 
 
@@ -620,21 +642,79 @@ def summarize_evaluation_results(evaluation_results: Dict[str, Any]) -> Dict[str
     """Summarize evaluation results across opponents."""
     rewards = []
     coop_rates = []
+    opponent_pred_accs = []
+    
     for stats in evaluation_results.values():
         if isinstance(stats, dict):
             if 'average_reward' in stats:
                 rewards.append(stats['average_reward'])
             if 'cooperation_rate' in stats:
                 coop_rates.append(stats['cooperation_rate'])
+            if 'opponent_prediction_accuracy' in stats:
+                opponent_pred_accs.append(stats['opponent_prediction_accuracy'])
 
     mean_reward = float(np.mean(rewards)) if rewards else 0.0
+    std_reward = float(np.std(rewards)) if rewards else 0.0
     mean_cooperation_rate = float(np.mean(coop_rates)) if coop_rates else 0.0
+    std_cooperation_rate = float(np.std(coop_rates)) if coop_rates else 0.0
+    mean_opponent_prediction_accuracy = float(np.mean(opponent_pred_accs)) if opponent_pred_accs else 0.0
 
     return {
         'mean_reward': mean_reward,
+        'std_reward': std_reward,
         'mean_cooperation_rate': mean_cooperation_rate,
+        'std_cooperation_rate': std_cooperation_rate,
+        'mean_opponent_prediction_accuracy': mean_opponent_prediction_accuracy,
         'opponent_count': len(evaluation_results)
     }
+
+
+def save_training_metrics_to_csv(training_results: Dict, csv_path: str):
+    """Save training metrics to CSV for analysis."""
+    import csv
+    
+    # Extract epoch-level metrics from training results
+    history = training_results.get('training_history', {})
+    
+    rows = []
+    epochs = history.get('epoch', [])
+    for i, epoch in enumerate(epochs):
+        row = {
+            'epoch': epoch,
+            'avg_reward': history.get('avg_reward', [])[i] if i < len(history.get('avg_reward', [])) else None,
+            'cooperation_rate': history.get('cooperation_rate', [])[i] if i < len(history.get('cooperation_rate', [])) else None,
+            'total_loss': history.get('total_loss', [])[i] if i < len(history.get('total_loss', [])) else None,
+        }
+        rows.append(row)
+    
+    with open(csv_path, 'w', newline='') as f:
+        if rows:
+            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(rows)
+
+
+def save_evaluation_metrics_to_csv(eval_results: Dict, csv_path: str, test_condition: Dict):
+    """Save evaluation metrics to CSV for analysis."""
+    import csv
+    
+    # Extract metrics
+    summary = summarize_evaluation_results(eval_results)
+    
+    row = {
+        'test_game': test_condition['game'],
+        'test_opponent_range': test_condition['opponent_range'],
+        'mean_reward': summary.get('mean_reward', 0),
+        'std_reward': summary.get('std_reward', 0),
+        'mean_cooperation_rate': summary.get('mean_cooperation_rate', 0),
+        'std_cooperation_rate': summary.get('std_cooperation_rate', 0),
+        'mean_opponent_prediction_accuracy': summary.get('mean_opponent_prediction_accuracy', 0),
+    }
+    
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=row.keys())
+        writer.writeheader()
+        writer.writerow(row)
 
 
 def compute_generalization_error(
@@ -779,6 +859,234 @@ def run_basic_generalization_experiment(
     return complete_results
 
 
+def run_training_phase(
+    train_condition: Dict[str, Any],
+    matrix_config: Dict[str, Any],
+    network_config: NetworkConfig,
+    training_config: TrainingConfig,
+    device: torch.device,
+    output_dirs: Dict[str, str],
+    use_adaptive_loss: bool,
+    agent_type: str,
+    task_id: int
+) -> Dict[str, Any]:
+    """
+    Training-only phase: Train network and save checkpoint.
+    
+    Returns:
+        Dictionary with training results and checkpoint path
+    """
+    logger = logging.getLogger(__name__)
+    
+    train_game = train_condition['game']
+    train_opponent_range = train_condition['opponent_range']
+    train_opponents_probs = train_condition['opponents']
+    
+    logger.info(f"=== TRAINING PHASE: Task {task_id} ===")
+    logger.info(f"Game: {train_game}, Opponents: {train_opponent_range} ({train_opponents_probs})")
+    
+    # Create network and trainer
+    train_game_instance = GameFactory.create_game(train_game)
+    network = create_network(network_config, train_game_instance)
+    train_opponents = OpponentFactory.create_opponent_set(train_opponents_probs)
+    
+    trainer = GameTrainer(
+        network=network,
+        training_config=training_config,
+        device=device,
+        use_adaptive_loss=use_adaptive_loss,
+        agent_type=agent_type
+    )
+    
+    # Train
+    logger.info("Starting training...")
+    training_results = trainer.train_on_game(
+        game_name=train_game,
+        opponents=train_opponents,
+        save_dir=output_dirs['checkpoints']
+    )
+    
+    # Save training metrics to CSV
+    training_csv = os.path.join(output_dirs['results'], f'training_task_{task_id}_metrics.csv')
+    save_training_metrics_to_csv(training_results, training_csv)
+    
+    # Checkpoint path (saved by trainer)
+    checkpoint_path = os.path.join(output_dirs['checkpoints'], f'{train_game}_final_checkpoint.pth')
+    
+    # Create training summary
+    results = {
+        'phase': 'training',
+        'task_id': task_id,
+        'training_condition': train_condition,
+        'training_results': training_results,
+        'checkpoint_path': checkpoint_path,
+        'agent_type': agent_type
+    }
+    
+    # Save pickled results
+    results_file = os.path.join(output_dirs['results'], f'training_task_{task_id}_results.pkl')
+    save_results(results, results_file)
+    
+    # JSON report
+    report = {
+        'phase': 'training',
+        'task_id': task_id,
+        'training_condition': train_condition,
+        'epochs': training_results.get('final_metrics', {}).get('total_epochs', 0),
+        'converged': training_results.get('final_metrics', {}).get('convergence_info', {}).get('converged', False),
+        'checkpoint_path': checkpoint_path,
+        'agent_type': agent_type
+    }
+    
+    report_file = os.path.join(output_dirs['results'], f'training_task_{task_id}_report.json')
+    with open(report_file, 'w') as f:
+        json.dump(report, f, indent=2, cls=NumpyJSONEncoder)
+    
+    logger.info(f"Training complete. Checkpoint saved to: {checkpoint_path}")
+    logger.info(f"Training metrics saved to: {training_csv}")
+    
+    return results
+
+
+def run_evaluation_phase(
+    checkpoint_path: str,
+    test_condition_ids: List[int],
+    matrix_config: Dict[str, Any],
+    network_config: NetworkConfig,
+    device: torch.device,
+    output_dirs: Dict[str, str],
+    agent_type: str,
+    task_id: int
+) -> Dict[str, Any]:
+    """
+    Evaluation-only phase: Load checkpoint and test on specified conditions.
+    
+    Args:
+        checkpoint_path: Path to trained model checkpoint
+        test_condition_ids: List of condition IDs to test on
+        task_id: Used for output naming (format: model_id_test_condition_id)
+    
+    Returns:
+        Dictionary with evaluation results
+    """
+    logger = logging.getLogger(__name__)
+    
+    if not os.path.exists(checkpoint_path):
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+    
+    logger.info(f"=== EVALUATION PHASE: Testing Task {task_id} ===")
+    logger.info(f"Loading checkpoint: {checkpoint_path}")
+    logger.info(f"Test conditions: {test_condition_ids}")
+    
+    # Load checkpoint to get training info
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    trained_game = checkpoint.get('game_name', 'unknown')
+    training_condition_id = checkpoint.get('task_id', None)
+    
+    # Create dummy network and load weights
+    train_game_instance = GameFactory.create_game(trained_game)
+    network = create_network(network_config, train_game_instance)
+    network.network.load_state_dict(checkpoint['model_state_dict'])
+    network.network.to(device)
+    network.network.eval()
+    
+    # Create trainer (no training will occur)
+    # Use dummy training config
+    dummy_training_config = TrainingConfig()
+    trainer = GameTrainer(
+        network=network,
+        training_config=dummy_training_config,
+        device=device,
+        use_adaptive_loss=False,
+        agent_type=agent_type
+    )
+    
+    # Get all test conditions
+    training_conditions = matrix_config['training_conditions']
+    eval_config = matrix_config.get('evaluation_config', {})
+    num_sessions = eval_config.get('num_sessions', 20)
+    enable_detailed = eval_config.get('enable_detailed_testing', True)
+    
+    # Run evaluations
+    evaluation_results = {}
+    
+    for test_cond_id in test_condition_ids:
+        if test_cond_id < 0 or test_cond_id >= len(training_conditions):
+            logger.warning(f"Invalid test condition ID: {test_cond_id}. Skipping.")
+            continue
+        
+        test_condition = training_conditions[test_cond_id]
+        test_game = test_condition['game']
+        test_opponent_range = test_condition['opponent_range']
+        test_opponents_probs = test_condition['opponents']
+        
+        logger.info(f"Testing on: {test_game} + {test_opponent_range}")
+        
+        # Create test game and opponents
+        test_game_instance = GameFactory.create_game(test_game)
+        test_opponents = OpponentFactory.create_opponent_set(test_opponents_probs)
+        
+        # Evaluate
+        results = trainer.evaluate(
+            game=test_game_instance,
+            opponents=test_opponents,
+            num_sessions=num_sessions,
+            enable_detailed_testing=enable_detailed,
+            testing_log_dir=os.path.join(output_dirs['logs'], f'eval_cond_{test_cond_id}')
+        )
+        
+        # Save to CSV
+        test_csv = os.path.join(
+            output_dirs['results'], 
+            f'test_model_{training_condition_id}_on_condition_{test_cond_id}_metrics.csv'
+        )
+        save_evaluation_metrics_to_csv(results, test_csv, test_condition)
+        
+        evaluation_results[f'condition_{test_cond_id}'] = {
+            'test_condition': test_condition,
+            'results': results,
+            'csv_path': test_csv
+        }
+    
+    # Save complete results
+    complete_results = {
+        'phase': 'evaluation',
+        'task_id': task_id,
+        'training_condition_id': training_condition_id,
+        'checkpoint_path': checkpoint_path,
+        'evaluation_results': evaluation_results,
+        'agent_type': agent_type
+    }
+    
+    results_file = os.path.join(
+        output_dirs['results'], 
+        f'eval_model_{training_condition_id}_task_{task_id}_results.pkl'
+    )
+    save_results(complete_results, results_file)
+    
+    # JSON report
+    report = {
+        'phase': 'evaluation',
+        'task_id': task_id,
+        'training_condition_id': training_condition_id,
+        'checkpoint_path': checkpoint_path,
+        'num_test_conditions': len(test_condition_ids),
+        'test_conditions': test_condition_ids,
+        'agent_type': agent_type
+    }
+    
+    report_file = os.path.join(
+        output_dirs['results'],
+        f'eval_model_{training_condition_id}_task_{task_id}_report.json'
+    )
+    with open(report_file, 'w') as f:
+        json.dump(report, f, indent=2, cls=NumpyJSONEncoder)
+    
+    logger.info(f"Evaluation complete. Tested {len(test_condition_ids)} conditions.")
+    
+    return complete_results
+
+
 def run_generalization_matrix_experiment(
     task_id: int,
     matrix_config_path: str,
@@ -787,13 +1095,18 @@ def run_generalization_matrix_experiment(
     device: torch.device,
     output_dirs: Dict[str, str],
     use_adaptive_loss: bool = False,
-    agent_type: str = 'proto-tom'
+    agent_type: str = 'proto-tom',
+    mode: str = 'full',
+    checkpoint_path: str = None,
+    test_condition_ids: List[int] = None
 ) -> Dict[str, Any]:
     """
     Run a single task from the generalization matrix experiment.
     
-    This function is designed for SLURM array job execution where each task_id
-    corresponds to a specific training condition (game + opponent range combination).
+    This function supports three modes:
+    - 'full': Train and test (original behavior)
+    - 'train-only': Train and save checkpoint
+    - 'eval-only': Load checkpoint and test
     
     For each training condition, we evaluate on:
     1. Same game, same opponents (baseline)
@@ -809,6 +1122,9 @@ def run_generalization_matrix_experiment(
         device: Device for computations
         output_dirs: Output directories
         use_adaptive_loss: Whether to use adaptive loss
+        mode: Execution mode ('full', 'train-only', 'eval-only')
+        checkpoint_path: Path to checkpoint (required for eval-only)
+        test_condition_ids: Condition IDs to test on (required for eval-only)
         
     Returns:
         Dictionary with complete experiment results
@@ -825,6 +1141,35 @@ def run_generalization_matrix_experiment(
         raise ValueError(f"Invalid task_id {task_id}. Must be 0-{len(training_conditions)-1}")
     
     train_condition = training_conditions[task_id]
+    
+    # === MODE BRANCHING ===
+    if mode == 'train-only':
+        logger.info(f"Running TRAIN-ONLY mode for task {task_id}")
+        return run_training_phase(
+            train_condition=train_condition,
+            matrix_config=matrix_config,
+            network_config=network_config,
+            training_config=training_config,
+            device=device,
+            output_dirs=output_dirs,
+            use_adaptive_loss=use_adaptive_loss,
+            agent_type=agent_type,
+            task_id=task_id
+        )
+    elif mode == 'eval-only':
+        logger.info(f"Running EVAL-ONLY mode for task {task_id}")
+        return run_evaluation_phase(
+            checkpoint_path=checkpoint_path,
+            test_condition_ids=test_condition_ids,
+            matrix_config=matrix_config,
+            network_config=network_config,
+            device=device,
+            output_dirs=output_dirs,
+            agent_type=agent_type,
+            task_id=task_id
+        )
+    
+    # === FULL MODE (original behavior) ===
     train_game = train_condition['game']
     train_opponent_range = train_condition['opponent_range']
     train_opponents_probs = train_condition['opponents']
@@ -1507,7 +1852,25 @@ def main():
             if task_id is None:
                 task_id = int(os.environ.get('SLURM_ARRAY_TASK_ID', 0))
             
-            logger.info(f"Running generalization-matrix experiment (task {task_id})")
+            # Parse test condition IDs for eval-only mode
+            test_condition_ids = None
+            if args.mode == 'eval-only':
+                if args.test_condition_ids is None:
+                    raise ValueError("--test-condition-ids required for eval-only mode")
+                if args.checkpoint_path is None:
+                    raise ValueError("--checkpoint-path required for eval-only mode")
+                
+                if args.test_condition_ids.lower() == 'all':
+                    # Load config to determine all conditions
+                    with open(args.matrix_config, 'r') as f:
+                        cfg = json.load(f)
+                    training_conditions = cfg['training_conditions']
+                    # Test on all conditions (caller will need to filter out training condition if desired)
+                    test_condition_ids = list(range(len(training_conditions)))
+                else:
+                    test_condition_ids = [int(x.strip()) for x in args.test_condition_ids.split(',')]
+            
+            logger.info(f"Running generalization-matrix experiment (mode: {args.mode}, task {task_id})")
             result = run_generalization_matrix_experiment(
                 task_id=task_id,
                 matrix_config_path=args.matrix_config,
@@ -1516,7 +1879,10 @@ def main():
                 device=device,
                 output_dirs=output_dirs,
                 use_adaptive_loss=args.adaptive_loss,
-                agent_type=args.agent_type
+                agent_type=args.agent_type,
+                mode=args.mode,
+                checkpoint_path=args.checkpoint_path,
+                test_condition_ids=test_condition_ids
             )
         elif args.experiment_mode == 'segmented':
             logger.info("Running segmented experiments")

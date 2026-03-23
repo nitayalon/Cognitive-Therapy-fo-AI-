@@ -601,12 +601,13 @@ class GameTrainer:
         
         # Save final model
         if save_dir:
-            final_model_path = os.path.join(save_dir, "final_model.pt")
+            final_model_path = os.path.join(save_dir, f"{game_name}_final_checkpoint.pth")
             self.network_manager.save_checkpoint(
                 final_model_path,
                 self.optimizer.state_dict(),
                 self.current_epoch,
-                self.best_loss
+                self.best_loss,
+                game_name=game_name
             )
         
         # Finalize detailed logging

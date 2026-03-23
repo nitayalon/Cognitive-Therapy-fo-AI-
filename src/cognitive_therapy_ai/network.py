@@ -368,7 +368,7 @@ class NetworkManager:
             }
     
     def save_checkpoint(self, filepath: str, optimizer_state: Optional[Dict] = None, 
-                       epoch: int = None, loss: float = None):
+                       epoch: int = None, loss: float = None, **extra_metadata):
         """
         Save network checkpoint.
         
@@ -377,6 +377,7 @@ class NetworkManager:
             optimizer_state: Optional optimizer state dict
             epoch: Optional epoch number
             loss: Optional loss value
+            **extra_metadata: Additional metadata to save (e.g., game_name, task_id)
         """
         checkpoint = {
             'model_state_dict': self.network.state_dict(),
@@ -394,6 +395,9 @@ class NetworkManager:
             checkpoint['epoch'] = epoch
         if loss is not None:
             checkpoint['loss'] = loss
+        
+        # Add any extra metadata
+        checkpoint.update(extra_metadata)
         
         torch.save(checkpoint, filepath)
         self.logger.info(f"Checkpoint saved to {filepath}")
