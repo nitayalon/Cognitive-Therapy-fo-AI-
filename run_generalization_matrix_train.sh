@@ -7,7 +7,7 @@
 #SBATCH --mem=32G
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
-#SBATCH --time=2-00:00:00
+#SBATCH --time=3-00:00:00
 #SBATCH --job-name=gen_matrix_train
 #SBATCH --array=0-74
 

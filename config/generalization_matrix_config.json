@@ -51,7 +51,7 @@
     "num_games_per_partner": 100,
     "learning_rate": 0.001,
     "batch_size": 32,
-    "max_epochs": 500,
+    "max_epochs": 1000,
     "convergence_threshold": 1e-6,
     "patience": 50,
     "checkpoint_frequency": 100
