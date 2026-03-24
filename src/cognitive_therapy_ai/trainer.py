@@ -1496,9 +1496,15 @@ class GameTrainer:
                 # Average results for this opponent
                 if opponent_results:
                     avg_results = {}
-                    for key in opponent_results[0].keys():
-                        if isinstance(opponent_results[0][key], (int, float)):
-                            avg_results[key] = np.mean([r[key] for r in opponent_results])
+                    # Explicitly average all numeric fields
+                    numeric_keys = ['cumulative_reward', 'average_reward', 'cooperation_rate', 
+                                    'opponent_cooperation_rate', 'num_games', 'opponent_type']
+                    
+                    for key in numeric_keys:
+                        if key in opponent_results[0]:
+                            values = [r[key] for r in opponent_results if key in r]
+                            if values:
+                                avg_results[key] = float(np.mean(values))
                     
                     opponent_label = self._get_opponent_label(opponent)
                     evaluation_results[opponent_label] = avg_results
@@ -1605,16 +1611,19 @@ class GameTrainer:
             # Update hidden state for next step
             hidden = new_hidden
         
-        # Compile session results
+        # Compile session results - convert all to standard Python types
+        cumulative_reward = float(session_stats['cumulative_reward'])
+        total_games = float(session_stats['total_games'])
+        cooperation_count = float(session_stats['cooperation_count'])
+        
         session_results = {
             'session_stats': {
-                'cumulative_reward': session_stats['cumulative_reward'],
-                'average_reward': session_stats['cumulative_reward'] / session_stats['total_games'],
-                'cooperation_rate': session_stats['cooperation_count'] / session_stats['total_games'],
-                'opponent_cooperation_rate': sum(1 for round_data in game.history if round_data['opponent_action'] == Action.COOPERATE) / len(game.history) if game.history else 0.0,
-                'num_games': session_stats['total_games'],
-                'opponent_type': opponent.get_type_parameter(),
-                'opponent_name': opponent.get_strategy_name()
+                'cumulative_reward': cumulative_reward,
+                'average_reward': cumulative_reward / total_games,
+                'cooperation_rate': cooperation_count / total_games,
+                'opponent_cooperation_rate': float(sum(1 for round_data in game.history if round_data['opponent_action'] == Action.COOPERATE) / len(game.history)) if game.history else 0.0,
+                'num_games': total_games,
+                'opponent_type': float(opponent.get_type_parameter()) if opponent.get_type_parameter() is not None else 0.5
             }
         }
         

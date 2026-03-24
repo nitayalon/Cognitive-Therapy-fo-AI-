@@ -674,16 +674,23 @@ def save_training_metrics_to_csv(training_results: Dict, csv_path: str):
     import csv
     
     # Extract epoch-level metrics from training results
-    history = training_results.get('training_history', {})
+    epoch_results = training_results.get('epoch_results', [])
+    
+    if not epoch_results:
+        # No epoch results to save
+        return
     
     rows = []
-    epochs = history.get('epoch', [])
-    for i, epoch in enumerate(epochs):
+    for epoch_idx, epoch_data in enumerate(epoch_results):
         row = {
-            'epoch': epoch,
-            'avg_reward': history.get('avg_reward', [])[i] if i < len(history.get('avg_reward', [])) else None,
-            'cooperation_rate': history.get('cooperation_rate', [])[i] if i < len(history.get('cooperation_rate', [])) else None,
-            'total_loss': history.get('total_loss', [])[i] if i < len(history.get('total_loss', [])) else None,
+            'epoch': epoch_idx,
+            'total_loss': epoch_data.get('total_loss', None),
+            'rl_loss': epoch_data.get('rl_loss', None),
+            'opponent_policy_loss': epoch_data.get('opponent_policy_loss', None),
+            'opponent_reward_loss': epoch_data.get('opponent_reward_loss', None),
+            'epoch_cumulative_reward': epoch_data.get('epoch_cumulative_reward', None),
+            'epoch_average_cooperation_rate': epoch_data.get('epoch_average_cooperation_rate', None),
+            'num_sessions': epoch_data.get('num_sessions', None),
         }
         rows.append(row)
     
@@ -986,9 +993,9 @@ def run_evaluation_phase(
     # Create dummy network and load weights
     train_game_instance = GameFactory.create_game(trained_game)
     network = create_network(network_config, train_game_instance)
-    network.network.load_state_dict(checkpoint['model_state_dict'])
-    network.network.to(device)
-    network.network.eval()
+    network.load_state_dict(checkpoint['model_state_dict'])
+    network.to(device)
+    network.eval()
     
     # Create trainer (no training will occur)
     # Use dummy training config
