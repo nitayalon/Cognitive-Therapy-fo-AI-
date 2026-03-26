@@ -61,13 +61,24 @@ else
     TEST_CONDITION_ID=$TEST_OFFSET
 fi
 
-# Find checkpoint
-CHECKPOINT_DIR="${TRAINING_DIR}/training/condition_${TRAINING_CONDITION_ID}_seed_${SEED_ID}/checkpoints"
-# Find the actual checkpoint file (game name embedded)
-CHECKPOINT_PATH=$(find "$CHECKPOINT_DIR" -name "*_final_checkpoint.pth" 2>/dev/null | head -n 1)
+# Find checkpoint (navigate through experiment directory)
+CONDITION_DIR="${TRAINING_DIR}/training/condition_${TRAINING_CONDITION_ID}_seed_${SEED_ID}"
+if [ ! -d "$CONDITION_DIR" ]; then
+    echo "ERROR: Condition directory not found: $CONDITION_DIR"
+    exit 1
+fi
 
+# Find experiment directory (generalization_matrix_*)
+EXP_DIR=$(find "$CONDITION_DIR" -maxdepth 1 -type d -name "generalization_matrix_*" 2>/dev/null | head -n 1)
+if [ -z "$EXP_DIR" ] || [ ! -d "$EXP_DIR" ]; then
+    echo "ERROR: Experiment directory not found in $CONDITION_DIR"
+    exit 1
+fi
+
+# Find checkpoint file inside experiment/checkpoints/
+CHECKPOINT_PATH=$(find "$EXP_DIR/checkpoints" -name "*_final_checkpoint.pth" 2>/dev/null | head -n 1)
 if [ -z "$CHECKPOINT_PATH" ] || [ ! -f "$CHECKPOINT_PATH" ]; then
-    echo "ERROR: Checkpoint not found in $CHECKPOINT_DIR"
+    echo "ERROR: Checkpoint not found in $EXP_DIR/checkpoints"
     exit 1
 fi
 
