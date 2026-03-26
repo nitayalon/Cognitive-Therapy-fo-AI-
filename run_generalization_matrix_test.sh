@@ -8,11 +8,12 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=0-06:00:00
-#SBATCH --job-name=gen_matrix_test
-#SBATCH --array=0-1049
+#SBATCH --job-name=gen_matrix_test_p1
+#SBATCH --array=0-999%100
 
-# TESTING PHASE ONLY
-# 1050 tasks: 75 models × 14 test conditions
+# TESTING PHASE ONLY - PART 1 of 2
+# 1000 tasks: Tasks 0-999 (out of 1050 total)
+# MaxArraySize=1001, so split into two jobs
 # Each task loads one trained model and tests on one condition
 
 module purge
