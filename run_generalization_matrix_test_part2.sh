@@ -9,10 +9,10 @@
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=0-06:00:00
 #SBATCH --job-name=gen_matrix_test_p2
-#SBATCH --array=1000-1049%100
+#SBATCH --array=0-49%50
 
 # TESTING PHASE ONLY - PART 2 of 2
-# 50 tasks: Tasks 1000-1049 (out of 1050 total)
+# 50 tasks: Array 0-49 maps to global tasks 1000-1049 (out of 1050 total)
 # MaxArraySize=1001, so split into two jobs
 # Each task loads one trained model and tests on one condition
 
@@ -43,10 +43,11 @@ fi
 TEST_OUTPUT_DIR="experiments/generalization_matrix_test_${SLURM_ARRAY_JOB_ID}"
 mkdir -p "${TEST_OUTPUT_DIR}/testing"
 
-# Decode array task ID
+# Decode array task ID (add 1000 offset for Part 2)
+GLOBAL_TASK_ID=$((SLURM_ARRAY_TASK_ID + 1000))
 NUM_TEST_CONDITIONS=14
-MODEL_ID=$((SLURM_ARRAY_TASK_ID / NUM_TEST_CONDITIONS))
-TEST_OFFSET=$((SLURM_ARRAY_TASK_ID % NUM_TEST_CONDITIONS))
+MODEL_ID=$((GLOBAL_TASK_ID / NUM_TEST_CONDITIONS))
+TEST_OFFSET=$((GLOBAL_TASK_ID % NUM_TEST_CONDITIONS))
 
 # Get model details
 NUM_SEEDS=5
@@ -72,7 +73,7 @@ if [ -z "$CHECKPOINT_PATH" ] || [ ! -f "$CHECKPOINT_PATH" ]; then
 fi
 
 echo "=========================================="
-echo "TESTING PHASE - Task ${SLURM_ARRAY_TASK_ID}"
+echo "TESTING PHASE - Task ${GLOBAL_TASK_ID} (Array ${SLURM_ARRAY_TASK_ID} + 1000)"
 echo "Model: ${MODEL_ID} (Condition ${TRAINING_CONDITION_ID}, Seed ${SEED_ID})"
 echo "Test Condition: ${TEST_CONDITION_ID}"
 echo "Checkpoint: ${CHECKPOINT_PATH}"
@@ -82,7 +83,7 @@ echo "=========================================="
 time singularity exec ${CONTAINER_PATH} python main_experiment.py \
     --experiment-mode generalization-matrix \
     --mode eval-only \
-    --task-id ${SLURM_ARRAY_TASK_ID} \
+    --task-id ${GLOBAL_TASK_ID} \
     --checkpoint-path "$CHECKPOINT_PATH" \
     --test-condition-ids "${TEST_CONDITION_ID}" \
     --matrix-config "config/generalization_matrix_config.json" \
@@ -93,6 +94,6 @@ time singularity exec ${CONTAINER_PATH} python main_experiment.py \
 
 EXIT_STATUS=$?
 
-echo "Testing task ${SLURM_ARRAY_TASK_ID} completed (exit: ${EXIT_STATUS})"
+echo "Testing task ${GLOBAL_TASK_ID} completed (exit: ${EXIT_STATUS})"
 
 exit $EXIT_STATUS
