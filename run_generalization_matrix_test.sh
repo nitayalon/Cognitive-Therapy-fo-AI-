@@ -93,7 +93,7 @@ echo "=========================================="
 time singularity exec ${CONTAINER_PATH} python main_experiment.py \
     --experiment-mode generalization-matrix \
     --mode eval-only \
-    --task-id ${SLURM_ARRAY_TASK_ID} \
+    --task-id ${TRAINING_CONDITION_ID} \
     --checkpoint-path "$CHECKPOINT_PATH" \
     --test-condition-ids "${TEST_CONDITION_ID}" \
     --matrix-config "config/generalization_matrix_config.json" \
