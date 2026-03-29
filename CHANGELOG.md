@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Eval-Only Mode Task ID Validation (2026-03-29)**
+  - Fixed issue where eval-only mode rejected large task_id values (e.g., SLURM_ARRAY_TASK_ID)
+  - Moved task_id validation to only apply in train-only and full modes
+  - In eval-only mode, task_id is now only used for output naming and doesn't require validation
+  - This allows SLURM test arrays to work correctly with task IDs beyond the number of training conditions
+  - Files: `main_experiment.py` (run_generalization_matrix_experiment function)
+
 ### Added
 - **Basic Single-Game Generalization Experiment (2026-02-05)**
   - New `basic` experiment mode for single-game training with explicit generalization tests

@@ -1142,14 +1142,31 @@ def run_generalization_matrix_experiment(
     with open(matrix_config_path, 'r') as f:
         matrix_config = json.load(f)
     
-    # Get training condition for this task
+    # Get training conditions list
     training_conditions = matrix_config['training_conditions']
+    
+    # === MODE BRANCHING ===
+    if mode == 'eval-only':
+        # In eval-only mode, task_id is only used for output naming
+        # No need to validate against training_conditions
+        logger.info(f"Running EVAL-ONLY mode (task_id {task_id} for naming)")
+        return run_evaluation_phase(
+            checkpoint_path=checkpoint_path,
+            test_condition_ids=test_condition_ids,
+            matrix_config=matrix_config,
+            network_config=network_config,
+            device=device,
+            output_dirs=output_dirs,
+            agent_type=agent_type,
+            task_id=task_id
+        )
+    
+    # For train-only and full modes, validate and get training condition
     if task_id < 0 or task_id >= len(training_conditions):
         raise ValueError(f"Invalid task_id {task_id}. Must be 0-{len(training_conditions)-1}")
     
     train_condition = training_conditions[task_id]
     
-    # === MODE BRANCHING ===
     if mode == 'train-only':
         logger.info(f"Running TRAIN-ONLY mode for task {task_id}")
         return run_training_phase(
@@ -1160,18 +1177,6 @@ def run_generalization_matrix_experiment(
             device=device,
             output_dirs=output_dirs,
             use_adaptive_loss=use_adaptive_loss,
-            agent_type=agent_type,
-            task_id=task_id
-        )
-    elif mode == 'eval-only':
-        logger.info(f"Running EVAL-ONLY mode for task {task_id}")
-        return run_evaluation_phase(
-            checkpoint_path=checkpoint_path,
-            test_condition_ids=test_condition_ids,
-            matrix_config=matrix_config,
-            network_config=network_config,
-            device=device,
-            output_dirs=output_dirs,
             agent_type=agent_type,
             task_id=task_id
         )
