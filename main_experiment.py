@@ -79,9 +79,9 @@ def parse_arguments():
     parser.add_argument(
         '--experiment-mode',
         type=str,
-        choices=['basic', 'multi-game', 'segmented', 'generalization-matrix'],
+        choices=['basic', 'multi-game', 'segmented', 'generalization-matrix', 'whole-population'],
         default='basic',
-        help='Experiment mode: basic (single game + generalization tests), multi-game, segmented, or generalization-matrix (SLURM array jobs)'
+        help='Experiment mode: basic (single game + generalization tests), multi-game, segmented, generalization-matrix (SLURM array jobs), or whole-population (train against full opponent spectrum)'
     )
     
     parser.add_argument(
@@ -103,6 +103,13 @@ def parse_arguments():
         type=str,
         default='config/generalization_matrix_config.json',
         help='Path to generalization matrix configuration file'
+    )
+    
+    parser.add_argument(
+        '--wp-config',
+        type=str,
+        default='config/whole_population_config.json',
+        help='Path to whole population configuration file'
     )
 
     parser.add_argument(
@@ -1387,6 +1394,366 @@ def run_generalization_matrix_experiment(
     return complete_results
 
 
+def run_whole_population_training_phase(
+    train_condition: Dict[str, Any],
+    wp_config: Dict[str, Any],
+    network_config: NetworkConfig,
+    training_config: TrainingConfig,
+    device: torch.device,
+    output_dirs: Dict[str, str],
+    task_id: int
+) -> Dict[str, Any]:
+    """
+    Training phase for whole population experiment: Train vanilla RL agent 
+    against full opponent spectrum [0.0-1.0].
+    
+    Args:
+        train_condition: Training condition (game + full opponent spectrum)
+        wp_config: Whole population config dictionary
+        network_config: Network configuration
+        training_config: Training configuration  
+        device: Device for computations
+        output_dirs: Output directories
+        task_id: Task ID for identification
+        
+    Returns:
+        Dictionary with training results and checkpoint path
+    """
+    logger = logging.getLogger(__name__)
+    
+    train_game = train_condition['game']
+    train_opponents_probs = train_condition['opponents']  # Full spectrum [0.0, 0.1, ..., 1.0]
+    
+    logger.info(f"=== WHOLE POPULATION TRAINING: Task {task_id} ===")
+    logger.info(f"Game: {train_game}")
+    logger.info(f"Opponents: Full spectrum {train_opponents_probs}")
+   
+    # Create network (vanilla RL only)
+    train_game_instance = GameFactory.create_game(train_game)
+    network = create_network(network_config, train_game_instance)
+    
+    # Create opponent set (full spectrum)
+    train_opponents = OpponentFactory.create_opponent_set(train_opponents_probs)
+    
+    # Create vanilla RL trainer (no ToM)
+    trainer = GameTrainer(
+        network=network,
+        training_config=training_config,
+        device=device,
+        use_adaptive_loss=False,
+        agent_type='vanilla'
+    )
+    
+    # Train
+    logger.info(f"Starting training on {train_game} with {len(train_opponents)} opponent types...")
+    training_results = trainer.train_on_game(
+        game_name=train_game,
+        opponents=train_opponents,
+        save_dir=output_dirs['checkpoints']
+    )
+    
+    # Save training metrics to CSV
+    training_csv = os.path.join(output_dirs['results'], f'training_task_{task_id}_metrics.csv')
+    save_training_metrics_to_csv(training_results, training_csv)
+    
+    # Checkpoint path
+    checkpoint_path = os.path.join(output_dirs['checkpoints'], f'{train_game}_final_checkpoint.pth')
+    
+    # Add task_id to checkpoint for testing phase
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint['task_id'] = task_id
+        checkpoint['condition_id'] = train_condition['id']
+        checkpoint['experiment_type'] = 'whole_population'
+        torch.save(checkpoint, checkpoint_path)
+    
+    # Create results summary
+    results = {
+        'phase': 'training',
+        'task_id': task_id,
+        'experiment_type': 'whole_population',
+        'training_condition': train_condition,
+        'training_results': training_results,
+        'checkpoint_path': checkpoint_path,
+        'agent_type': 'vanilla'
+    }
+    
+    # Save pickled results
+    results_file = os.path.join(output_dirs['results'], f'training_task_{task_id}_results.pkl')
+    save_results(results, results_file)
+    
+    # JSON report
+    report = {
+        'phase': 'training',
+        'task_id': task_id,
+        'experiment_type': 'whole_population',
+        'training_condition': train_condition,
+        'epochs': training_results.get('final_metrics', {}).get('total_epochs', 0),
+        'converged': training_results.get('final_metrics', {}).get('convergence_info', {}).get('converged', False),
+        'final_loss': training_results.get('final_metrics', {}).get('final_loss', None),
+        'policy_entropy': training_results.get('final_metrics', {}).get('policy_entropy', None),
+        'checkpoint_path': checkpoint_path,
+        'agent_type': 'vanilla'
+    }
+    
+    report_file = os.path.join(output_dirs['results'], f'training_task_{task_id}_report.json')
+    with open(report_file, 'w') as f:
+        json.dump(report, f, indent=2, cls=NumpyJSONEncoder)
+    
+    logger.info(f"Training complete. Epochs: {report['epochs']}, Converged: {report['converged']}")
+    logger.info(f"Checkpoint saved to: {checkpoint_path}")
+    logger.info(f"Training metrics saved to: {training_csv}")
+    
+    return results
+
+
+def run_whole_population_evaluation_phase(
+    checkpoint_path: str,
+    test_game: str,
+    test_opponents: List[float],
+    wp_config: Dict[str, Any],
+    network_config: NetworkConfig,
+    device: torch.device,
+    output_dirs: Dict[str, str],
+    model_id: int,
+    test_task_id: int
+) -> Dict[str, Any]:
+    """
+    Evaluation phase for whole population experiment: Test trained agent on 
+    specific game and opponent type.
+    
+    Args:
+        checkpoint_path: Path to trained model checkpoint
+        test_game: Game to test on
+        test_opponents: List of opponent defection probabilities to test
+        wp_config: Whole population config
+        network_config: Network configuration
+        device: Device for computations
+        output_dirs: Output directories
+        model_id: ID of trained model (0-14 for 3 games × 5 seeds)
+        test_task_id: Combined task ID for SLURM array
+        
+    Returns:
+        Dictionary with evaluation results
+    """
+    logger = logging.getLogger(__name__)
+    
+    if not os.path.exists(checkpoint_path):
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+    
+    logger.info(f"=== WHOLE POPULATION EVALUATION: Task {test_task_id} ===")
+    logger.info(f"Model ID: {model_id}")
+    logger.info(f"Loading checkpoint: {checkpoint_path}")
+    logger.info(f"Test game: {test_game}, Test opponents: {test_opponents}")
+    
+    # Load checkpoint
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    trained_game = checkpoint.get('game_name', 'unknown')
+    training_task_id = checkpoint.get('task_id', model_id)
+    
+    # Create network and load weights
+    train_game_instance = GameFactory.create_game(trained_game)
+    network = create_network(network_config, train_game_instance)
+    network.load_state_dict(checkpoint['model_state_dict'])
+    network.to(device)
+    network.eval()
+    
+    # Create trainer (no training)
+    dummy_training_config = TrainingConfig()
+    trainer = GameTrainer(
+        network=network,
+        training_config=dummy_training_config,
+        device=device,
+        use_adaptive_loss=False,
+        agent_type='vanilla'
+    )
+    
+    # Evaluation config
+    eval_config = wp_config.get('evaluation_config', {})
+    num_sessions = eval_config.get('num_sessions', 20)
+    enable_detailed = eval_config.get('enable_detailed_testing', True)
+    
+    # Create test game and opponents
+    test_game_instance = GameFactory.create_game(test_game)
+    test_opponent_objects = OpponentFactory.create_opponent_set(test_opponents)
+    
+    logger.info(f"Testing trained {trained_game} agent on {test_game} with {len(test_opponent_objects)} opponents...")
+    
+    # Evaluate
+    eval_results = trainer.evaluate(
+        game=test_game_instance,
+        opponents=test_opponent_objects,
+        num_sessions=num_sessions,
+        enable_detailed_testing=enable_detailed,
+        testing_log_dir=os.path.join(output_dirs['logs'], f'eval_task_{test_task_id}')
+    )
+    
+    # Test condition identifier
+    test_condition_label = f"{test_game}_opponents_{test_opponents[0]:.1f}"
+    if len(test_opponents) > 1:
+        test_condition_label += f"_to_{test_opponents[-1]:.1f}"
+    
+    # Save to CSV
+    test_csv = os.path.join(
+        output_dirs['results'], 
+        f'eval_model_{training_task_id}_{trained_game}_on_{test_game}_opp_{test_opponents[0]:.1f}.csv'
+    )
+    
+    test_condition_dict = {
+        'game': test_game,
+        'opponents': test_opponents,
+        'trained_game': trained_game
+    }
+    save_evaluation_metrics_to_csv(eval_results, test_csv, test_condition_dict)
+    
+    # Compile results
+    results = {
+        'phase': 'evaluation',
+        'test_task_id': test_task_id,
+        'model_id': model_id,
+        'training_task_id': training_task_id,
+        'trained_game': trained_game,
+        'test_game': test_game,
+        'test_opponents': test_opponents,
+        'checkpoint_path': checkpoint_path,
+        'evaluation_results': eval_results,
+        'csv_path': test_csv,
+        'agent_type': 'vanilla',
+        'experiment_type': 'whole_population'
+    }
+    
+    # Save pickled results
+    results_file = os.path.join(
+        output_dirs['results'], 
+        f'eval_model_{training_task_id}_task_{test_task_id}_results.pkl'
+    )
+    save_results(results, results_file)
+    
+    # JSON report
+    report = {
+        'phase': 'evaluation',
+        'test_task_id': test_task_id,
+        'model_id': model_id,
+        'training_task_id': training_task_id,
+        'trained_game': trained_game,
+        'test_game': test_game,
+        'test_opponents': test_opponents,
+        'mean_reward': eval_results['summary']['mean_reward'],
+        'mean_cooperation_rate': eval_results['summary']['mean_cooperation_rate'],
+        'checkpoint_path': checkpoint_path,
+        'agent_type': 'vanilla'
+    }
+    
+    report_file = os.path.join(
+        output_dirs['results'],
+        f'eval_model_{training_task_id}_task_{test_task_id}_report.json'
+    )
+    with open(report_file, 'w') as f:
+        json.dump(report, f, indent=2, cls=NumpyJSONEncoder)
+    
+    logger.info(f"Evaluation complete. Mean reward: {report['mean_reward']:.4f}, Cooperation: {report['mean_cooperation_rate']:.4f}")
+    
+    return results
+
+
+def run_whole_population_experiment(
+    task_id: int,
+    wp_config_path: str,
+    network_config: NetworkConfig,
+    training_config: TrainingConfig,
+    device: torch.device,
+    output_dirs: Dict[str, str],
+    mode: str = 'train-only',
+    checkpoint_path: str = None,
+    test_game: str = None,
+    test_opponents: List[float] = None,
+    model_id: int = None
+) -> Dict[str, Any]:
+    """
+    Run whole population experiment task.
+    
+    Supports two modes:
+    - 'train-only': Train on single game against full opponent spectrum, save checkpoint
+    - 'eval-only': Load checkpoint and test on specified game and opponents
+    
+    Training mode:
+        task_id: 0-14 (3 games × 5 seeds)
+        Trains vanilla RL agent against [0.0, 0.1, 0.2, ..., 1.0] opponents
+        
+    Evaluation mode:
+        task_id: Used for output naming (decoded from SLURM array)
+        model_id: Which trained model to test (0-14)
+        test_game: Game to test on (PD, HD, or SH)
+        test_opponents: Opponent types to test
+    
+    Args:
+        task_id: SLURM array task ID
+        wp_config_path: Path to whole population config JSON
+        network_config: Network configuration
+        training_config: Training configuration
+        device: Device for computations
+        output_dirs: Output directories
+        mode: 'train-only' or 'eval-only'
+        checkpoint_path: Path to checkpoint (eval-only mode)
+        test_game: Game to test on (eval-only mode)
+        test_opponents: Opponent types to test (eval-only mode)
+        model_id: Trained model ID (eval-only mode)
+        
+    Returns:
+        Dictionary with experiment results
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Load config
+    with open(wp_config_path, 'r') as f:
+        wp_config = json.load(f)
+    
+    if mode == 'train-only':
+        # Training mode
+        training_conditions = wp_config['training_conditions']
+        
+        if task_id < 0 or task_id >= len(training_conditions) * 5:  # 3 conditions × 5 seeds
+            raise ValueError(f"Invalid task_id {task_id} for training. Must be 0-14 (3 games × 5 seeds)")
+        
+        # Decode task_id to condition and seed
+        condition_id = task_id // 5
+        seed_id = task_id % 5
+        
+        train_condition = training_conditions[condition_id]
+        
+        logger.info(f"Training task {task_id}: Condition {condition_id}, Seed {seed_id}")
+        
+        return run_whole_population_training_phase(
+            train_condition=train_condition,
+            wp_config=wp_config,
+            network_config=network_config,
+            training_config=training_config,
+            device=device,
+            output_dirs=output_dirs,
+            task_id=task_id
+        )
+    
+    elif mode == 'eval-only':
+        # Evaluation mode
+        if checkpoint_path is None or test_game is None or test_opponents is None or model_id is None:
+            raise ValueError("eval-only mode requires checkpoint_path, test_game, test_opponents, and model_id")
+        
+        return run_whole_population_evaluation_phase(
+            checkpoint_path=checkpoint_path,
+            test_game=test_game,
+            test_opponents=test_opponents,
+            wp_config=wp_config,
+            network_config=network_config,
+            device=device,
+            output_dirs=output_dirs,
+            model_id=model_id,
+            test_task_id=task_id
+        )
+    
+    else:
+        raise ValueError(f"Invalid mode: {mode}. Must be 'train-only' or 'eval-only'")
+
+
 def create_experiment_report(
     all_results: List[Dict[str, Any]], 
     output_dirs: Dict[str, str]
@@ -1750,6 +2117,12 @@ def main():
                 experiment_name = f"generalization_matrix_task_{task_id}_run_{args.run_id}_{timestamp}"
             else:
                 experiment_name = f"generalization_matrix_task_{task_id}_{timestamp}"
+        elif args.experiment_mode == 'whole-population':
+            task_id = args.task_id if args.task_id is not None else 0
+            if args.run_id is not None:
+                experiment_name = f"whole_population_task_{task_id}_run_{args.run_id}_{timestamp}"
+            else:
+                experiment_name = f"whole_population_task_{task_id}_{timestamp}"
         else:
             experiment_name = f"mixed_motive_experiment_{timestamp}"
     output_dirs = create_output_dirs(args.output_dir, experiment_name)
@@ -1781,6 +2154,9 @@ def main():
             raise ValueError(f"Invalid test game '{test_game}'. Must be one of: {', '.join(valid_games)}")
     elif args.experiment_mode == 'generalization-matrix':
         # Validation is done inside run_generalization_matrix_experiment using the config file
+        pass
+    elif args.experiment_mode == 'whole-population':
+        # Validation is done inside run_whole_population_experiment using the config file
         pass
     else:
         for game in training_games:
@@ -1896,6 +2272,56 @@ def main():
                 checkpoint_path=args.checkpoint_path,
                 test_condition_ids=test_condition_ids
             )
+        elif args.experiment_mode == 'whole-population':
+            # Get task_id from args or environment variable (SLURM_ARRAY_TASK_ID)
+            task_id = args.task_id
+            if task_id is None:
+                task_id = int(os.environ.get('SLURM_ARRAY_TASK_ID', 0))
+            
+            # Whole population experiment: different handling for train vs eval
+            if args.mode == 'eval-only':
+                # For evaluation, need checkpoint, test game, and test opponents
+                if args.checkpoint_path is None:
+                    raise ValueError("--checkpoint-path required for eval-only mode")
+                if args.test_game is None:
+                    raise ValueError("--test-game required for eval-only mode (whole-population)")
+                if args.test_opponents is None:
+                    raise ValueError("--test-opponents required for eval-only mode (whole-population)")
+                
+                # Parse test opponents
+                test_opponent_list = [float(p.strip()) for p in args.test_opponents.split(',')]
+                
+                # Model ID: which trained model (0-14 for 3 games x 5 seeds)
+                # Will be extracted from checkpoint or provided separately
+                # For now, derive from task_id or checkpoint
+                model_id = task_id // 15  # Assuming 15 test conditions per model
+                
+                logger.info(f"Running whole-population evaluation (mode: {args.mode}, task {task_id})")
+                result = run_whole_population_experiment(
+                    task_id=task_id,
+                    wp_config_path=args.wp_config,
+                    network_config=network_config,
+                    training_config=training_config,
+                    device=device,
+                    output_dirs=output_dirs,
+                    mode=args.mode,
+                    checkpoint_path=args.checkpoint_path,
+                    test_game=test_game,
+                    test_opponents=test_opponent_list,
+                    model_id=model_id
+                )
+            else:
+                # Training mode
+                logger.info(f"Running whole-population training (mode: {args.mode}, task {task_id})")
+                result = run_whole_population_experiment(
+                    task_id=task_id,
+                    wp_config_path=args.wp_config,
+                    network_config=network_config,
+                    training_config=training_config,
+                    device=device,
+                    output_dirs=output_dirs,
+                    mode=args.mode
+                )
         elif args.experiment_mode == 'segmented':
             logger.info("Running segmented experiments")
             result = run_segmented_experiments(

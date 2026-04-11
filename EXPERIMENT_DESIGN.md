@@ -23,15 +23,15 @@
 ## 1. Research Overview
 
 ### 1.1 Project Goal
-This project aims to explore the causal relation between train environment features and the (in)ability to generalize. In particular, this work models maladaptation as generalization error. Our paradigm trains RL agents in various well knoe mixed-motive games against well defined opponents, and then test (generalize) the learning to new games and/or new opponents.  
+This project aims to explore the causal relation between training environment features and the (in)ability to generalize. In particular, this work models maladaptation as generalization error. Our paradigm trains RL agents in various well-known mixed-motive games against well-defined opponents, and then tests (generalizes) the learning to new games and/or new opponents.  
 
 ### 1.2 Key Innovation
-This framework uses two (nested) multi-agent paradigms to explore the realtion between the complexity of the training environment and the learner's ability (or lack of it) to successfuly interact with other agents in unseen ineractions.
-We compare between opponet unaware models (plain RRN, trained to maximize reward) and opponent aware (proto-Theory of Mind) models, in which the agents is also trained to predict others' future actinos and reward (learning their incentives).
+This framework uses two (nested) multi-agent paradigms to explore the relation between the complexity of the training environment and the learner's ability (or lack thereof) to successfully interact with other agents in unseen interactions.
+We compare opponent-unaware models (plain RNN, trained to maximize reward) and opponent-aware (proto-Theory of Mind) models, in which the agent is also trained to predict others' future actions and rewards (learning their incentives).
 Our analysis is focused on:
-- Representation failure (maladaptiveness) as a function of the traning task charectaristics (complexity, number of Nash-Equillibria)
+- Representation failure (maladaptiveness) as a function of the training task characteristics (complexity, number of Nash equilibria)
 - Generalization across game structures and opponent types
-- The role of proto Theory of Mind in social decision-making
+- The role of proto-Theory of Mind in social decision-making
 
 ### 1.3 Cognitive Therapy Analogy
 [Explain the cognitive therapy metaphor and its relevance to AI systems]
@@ -144,6 +144,10 @@ L_proto-ToM = LRL_norm + α * LOp_action_norm + β * LOp_reward_norm
 - Which auxiliary task is more predictive of generalization success?
 - Do they interact synergistically?
 
+### 3.3 Full Opponent Spectrum Training
+
+**RQ6**: Given the different dynamics of the type-task training and generalization patterns, which training-generalization patterns will emerge with agents trained on the full type spectrum?
+
 ---
 
 ## 4. Hypotheses
@@ -191,6 +195,13 @@ L_proto-ToM = LRL_norm + α * LOp_action_norm + β * LOp_reward_norm
 - **Rationale**: Complex games require deeper opponent understanding, amplifying proto-ToM benefits
 - **Test**: ANOVA with game_type as factor; examine proto-ToM advantage by training game 
 
+
+### 4.5 Training Against the Entire Population
+
+**H8**: Agents trained against the entire population will display an averaged behavior of the task-type behavior. 
+- **Prediction**: Training against the whole type spectrum is akin to averaging the individual behaviors. For example, in the PD task, the full population agent will learn the optimal policy fast, and will struggle with generalization. On the contrary, in the SH task, the agent will learn a more complex policy (higher entropy), might not converge, but will generalize better.
+- **Rationale**: The optimal policy is a function of the training manifold
+- **Test**: Same analysis as the task-type analysis
 ---
 
 ## 5. Experiment Design
@@ -315,6 +326,47 @@ p(Cooperate) = 1 - p_d
 
 **Training Set**: Multiple opponents sampled from specified range
 - Example: Range [0.1, 0.3] → 11 equally spaced opponents: {0.1, 0.12, 0.14, ..., 0.3}
+
+
+### 5.5 Whole Population Training
+
+**Motivation**: Test H8 - whether training against the entire opponent spectrum produces averaged behavior across opponent types, with game-specific effects on convergence and generalization.
+
+**Core Design**: Each training game is run with **vanilla RL agents** and **multiple seeds**:
+
+**Training Paradigm**:
+- **Vanilla RL Agent**: Trained only to maximize reward (baseline)
+- Each agent is trained on a single game against the **full opponent spectrum**
+- **Opponent Sampling**: At each epoch, opponents are sampled from a discrete uniform distribution over [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] (11 equally spaced defection probabilities)
+- Each epoch involves playing against multiple randomly sampled opponents from this distribution
+- **Training Duration**: Same total training experience as segmented training (Section 5.3)
+
+**Testing Paradigm**:
+- **Test Games**: All 3 games (including training game for completeness, though within-task testing is less informative given full-spectrum training)
+- **Test Opponents**: 5 representative types matching fine-grained experiment: [0.1, 0.3, 0.5, 0.7, 0.9] (midpoints of ranges from Section 5.3)
+- **Evaluation**: 20 sessions per test opponent (consistent with Section 6.4)
+
+**Replication Structure**:
+```
+For each training game (PD, HD, SH):
+    For each seed in [42, 52, 62, 72, 82]:
+        Train Vanilla Agent against full spectrum → 
+        Test on all 3 games × 5 opponents → 
+        Measure in-distribution and cross-game generalization
+```
+
+**Result**: 
+- 3 training games × 1 agent type × 5 seeds = **15 trained agents**
+- 15 agents × 3 test games × 5 opponents = **225 generalization measurements**
+- 5 independent samples per (training_game, test_game, test_opponent) combination
+- Direct comparison of full-spectrum vs. segmented training patterns (from Section 5.3)
+
+**Comparison Goals**:
+- Full-spectrum vs. segmented training generalization performance
+- Game-specific effects: Does PD show faster convergence but worse generalization, while SH shows slower convergence but better generalization?
+- Test predictions from H8 about averaged behavior and training manifold effects
+
+
 
 ---
 
@@ -663,11 +715,11 @@ Reward_Error = MSE(predicted_opponent_rewards, actual_opponent_rewards)
 **Primary Comparisons**:
 
 1. **Generalization Matrix Visualization**:
-   - **Two 5×3x16 heatmaps**: One for each training setup
-   - Rows: Opponnent's prosociality, Columns: Tasks
-   - Metrics: Normalized reward (train setting is set to zero - evrything is relative), cooperation rate
+   - **Two 5×3 heatmaps**: One for each training setup (vanilla and proto-ToM)
+   - Rows: Opponent's prosociality (cooperation level), Columns: Tasks (games)
+   - Metrics: Normalized reward (training setting is set to zero - everything is relative), cooperation rate
 
-3. **Condition-Specific Analysis**:
+2. **Condition-Specific Analysis**:
    - **Same-game/new-opponents**: Opponent generalization ability
    - **New-game/same-opponents**: Game structure generalization ability
    - **New-game/new-opponents**: Combined generalization challenge
@@ -746,7 +798,7 @@ Reward_Error = MSE(predicted_opponent_rewards, actual_opponent_rewards)
 
 2. **Statistical Summary** (`tables/`):
    - `descriptive_statistics.csv`: Means, SDs by agent type and condition
-   - `hypothesis_tests.csv`: Results for H1-H7 with p-values and effect sizes
+   - `hypothesis_tests.csv`: Results for H1-H8 with p-values and effect sizes
    - `agent_comparison_summary.csv`: Direct vanilla vs proto-ToM comparisons
 
 3. **Auxiliary Task Analysis** (`figures/proto_tom/`):
@@ -767,6 +819,53 @@ Reward_Error = MSE(predicted_opponent_rewards, actual_opponent_rewards)
 - ToM development trajectories
 - Loss component analyses
 - Game-specific deep dives
+
+### 9.7 Whole Population Training Analysis
+
+**Training Convergence Analysis**:
+- **Convergence Speed**: Compare epochs to convergence across games (PD vs. HD vs. SH)
+  - Hypothesis: PD converges fastest (dominant strategy), SH slowest (multiple equilibria)
+- **Policy Entropy**: Track policy entropy during training
+  - Hypothesis: PD develops low-entropy (deterministic) policy, SH maintains higher entropy
+- **Learning Curves**: Visualize reward accumulation over epochs for each game
+- **Stability**: Measure variance in performance across training epochs
+
+**Cross-Game Generalization Analysis**:
+- **Game Transfer Patterns**: Create 3×3 transfer matrix (training game × test game)
+  - Diagonal: Within-task performance (less meaningful but included for completeness)
+  - Off-diagonal: Cross-game generalization performance
+- **Hypothesis H8 Testing**:
+  - PD agents: High in-distribution performance, poor generalization (overfitting to optimal defection)
+  - SH agents: Lower/slower convergence, better cross-game transfer (more flexible policy)
+  - HD agents: Intermediate pattern
+
+**Comparison to Segmented Training** (Section 5.3):
+- **Performance Comparison**: Full-spectrum vs. opponent-range-specific training
+  - Do full-spectrum agents match or exceed best segmented agents?
+  - Does full-spectrum training provide robustness across all opponent types?
+- **Generalization Patterns**: Compare generalization matrices
+  - Full-spectrum: Expected to show uniform performance across opponent types
+  - Segmented: Expected to show performance peaks near training range
+
+**Opponent-Specific Analysis**:
+- **Performance vs. Opponent Type**: Plot reward across 5 test opponent types [0.1, 0.3, 0.5, 0.7, 0.9]
+  - Expected: Relatively flat performance profile (no strong opponent-type bias)
+- **Policy Adaptation**: Does agent adjust strategy based on opponent type despite full-spectrum training?
+
+**Statistical Tests**:
+- **H8 Validation**: ANOVA with training_game as factor on:
+  - Convergence speed (epochs to threshold)
+  - Final policy entropy
+  - Cross-game generalization error
+- **Pairwise Comparisons**: Post-hoc tests for game-specific differences
+- **Effect Sizes**: Cohen's d for game comparisons (PD vs. SH, PD vs. HD, SH vs. HD)
+
+**Visualizations** (`figures/whole_population/`):
+- `convergence_by_game.png`: Training curves for PD, HD, SH
+- `policy_entropy_evolution.png`: Entropy trajectories over training
+- `cross_game_transfer_matrix.png`: 3×3 heatmap of transfer performance
+- `full_vs_segmented_comparison.png`: Side-by-side generalization patterns
+- `opponent_type_performance.png`: Performance profiles across 5 test opponents
 
 ---
 
