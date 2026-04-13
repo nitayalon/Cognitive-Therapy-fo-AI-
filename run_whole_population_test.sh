@@ -106,7 +106,7 @@ singularity exec ${CONTAINER_PATH} python main_experiment.py \
     --checkpoint-path "${CHECKPOINT_PATH}" \
     --test-game ${TEST_GAME} \
     --test-opponents ${TEST_OPPONENT} \
-    --device cuda \
+    --device auto \
     --agent-type vanilla \
     --output-dir ${TEST_OUTPUT_DIR}/testing
 

@@ -84,7 +84,7 @@ singularity exec ${CONTAINER_PATH} python main_experiment.py \
     --seed ${SEED} \
     --max-epochs ${MAX_EPOCHS} \
     --num-games ${NUM_GAMES} \
-    --device cuda \
+    --device auto \
     --agent-type vanilla \
     --output-dir ${ARRAY_OUTPUT_DIR}/training
 
