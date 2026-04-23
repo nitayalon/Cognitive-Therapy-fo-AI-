@@ -714,10 +714,20 @@ def save_evaluation_metrics_to_csv(eval_results: Dict, csv_path: str, test_condi
     
     # Extract metrics
     summary = summarize_evaluation_results(eval_results)
+    opponent_range = test_condition.get('opponent_range')
+    if opponent_range is None:
+        opponents = test_condition.get('opponents', [])
+        if isinstance(opponents, list) and opponents:
+            if len(opponents) == 1:
+                opponent_range = f"{opponents[0]:.1f}"
+            else:
+                opponent_range = f"{opponents[0]:.1f}_to_{opponents[-1]:.1f}"
+        else:
+            opponent_range = 'unknown'
     
     row = {
         'test_game': test_condition['game'],
-        'test_opponent_range': test_condition['opponent_range'],
+        'test_opponent_range': opponent_range,
         'mean_reward': summary.get('mean_reward', 0),
         'std_reward': summary.get('std_reward', 0),
         'mean_cooperation_rate': summary.get('mean_cooperation_rate', 0),
@@ -1605,6 +1615,7 @@ def run_whole_population_evaluation_phase(
         'trained_game': trained_game
     }
     save_evaluation_metrics_to_csv(eval_results, test_csv, test_condition_dict)
+    summary = summarize_evaluation_results(eval_results)
     
     # Compile results
     results = {
@@ -1638,8 +1649,8 @@ def run_whole_population_evaluation_phase(
         'trained_game': trained_game,
         'test_game': test_game,
         'test_opponents': test_opponents,
-        'mean_reward': eval_results['summary']['mean_reward'],
-        'mean_cooperation_rate': eval_results['summary']['mean_cooperation_rate'],
+        'mean_reward': summary.get('mean_reward', 0.0),
+        'mean_cooperation_rate': summary.get('mean_cooperation_rate', 0.0),
         'checkpoint_path': checkpoint_path,
         'agent_type': 'vanilla'
     }
@@ -2306,7 +2317,7 @@ def main():
                     output_dirs=output_dirs,
                     mode=args.mode,
                     checkpoint_path=args.checkpoint_path,
-                    test_game=test_game,
+                    test_game=args.test_game,
                     test_opponents=test_opponent_list,
                     model_id=model_id
                 )
