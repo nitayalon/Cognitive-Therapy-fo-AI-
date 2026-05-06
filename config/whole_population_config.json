@@ -37,6 +37,7 @@
     "hidden_size": 128,
     "num_layers": 2,
     "dropout": 0.1,
+    "input_size": 6,
     "agent_type": "vanilla",
     "note": "Vanilla RL only (no ToM auxiliary tasks)"
   },

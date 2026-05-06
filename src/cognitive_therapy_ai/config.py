@@ -22,7 +22,7 @@ class NetworkConfig:
     hidden_size: int = 128
     num_layers: int = 2
     dropout: float = 0.1
-    input_size: int = 5  # Default for payoff matrix + round number representation
+    input_size: int = 6  # Default for payoff matrix + round number + opponent_prev_action
     
 
 @dataclass

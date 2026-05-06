@@ -29,7 +29,7 @@ class GameLSTM(nn.Module):
     This architecture implements the ToM-RL framework where auxiliary prediction
     tasks create inductive bias for understanding opponent behavior.
     
-    Input format: [payoff_matrix_flattened(4), round_number(1)] = 5 elements total
+    Input format: [payoff_matrix_flattened(4), round_number(1), opponent_prev_action(1)] = 6 elements total
     """
     
     def __init__(

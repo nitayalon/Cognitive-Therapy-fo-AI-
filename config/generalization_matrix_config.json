@@ -44,7 +44,8 @@
   "network_config": {
     "hidden_size": 128,
     "num_layers": 2,
-    "dropout": 0.1
+    "dropout": 0.1,
+    "input_size": 6
   },
   
   "training_config": {
