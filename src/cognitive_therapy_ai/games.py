@@ -66,10 +66,17 @@ class MixedMotiveGame(ABC):
     
     def get_state_vector(self) -> np.ndarray:
         """
-        Get a simplified state vector representation with payoff matrix, round number, and opponent's previous action.
+        Get a simplified state vector representation with payoff matrix, round number, and previous trial information.
         
         Returns:
-            State vector with payoff matrix (4 elements) + round number (1 element) + opponent_prev_action (1 element) = 6 elements total
+            State vector with:
+            - payoff_matrix (4 elements)
+            - round_number (1 element)
+            - opponent_prev_action (1 element)
+            - agent_prev_action (1 element)
+            - agent_prev_reward (1 element)
+            - opponent_prev_reward (1 element)
+            Total: 10 elements
         """
         # Get the payoff matrix (2x2 for all mixed-motive games)
         payoff_matrix = self.get_payoff_matrix()
@@ -83,15 +90,25 @@ class MixedMotiveGame(ABC):
         round_number = len(self.history)
         state_vector.append(round_number / 100.0)  # Normalize to reasonable range
         
-        # Add opponent's previous action (0 for COOPERATE, 1 for DEFECT, -1 for first trial)
+        # Add previous trial information
         if len(self.history) == 0:
-            # First trial - no previous action
+            # First trial - no previous actions or rewards
             opponent_prev_action = -1.0
+            agent_prev_action = -1.0
+            agent_prev_reward = 0.0
+            opponent_prev_reward = 0.0
         else:
-            # Get the opponent's action from the previous round
-            opponent_prev_action = float(self.history[-1]['opponent_action'].value)
+            # Get information from the previous round
+            prev_round = self.history[-1]
+            opponent_prev_action = float(prev_round['opponent_action'].value)
+            agent_prev_action = float(prev_round['player_action'].value)
+            agent_prev_reward = prev_round['player_payoff']
+            opponent_prev_reward = prev_round['opponent_payoff']
         
         state_vector.append(opponent_prev_action)
+        state_vector.append(agent_prev_action)
+        state_vector.append(agent_prev_reward)
+        state_vector.append(opponent_prev_reward)
         
         return np.array(state_vector, dtype=np.float32)
     
@@ -100,9 +117,9 @@ class MixedMotiveGame(ABC):
         Get the size of the state vector.
         
         Returns:
-            Size of the state vector (payoff matrix + round number + opponent_prev_action = 6 elements)
+            Size of the state vector (payoff matrix + round number + previous trial info = 9 elements)
         """
-        return 6  # 4 elements for payoff matrix + 1 for round number + 1 for opponent's previous action
+        return 9  # 4 (payoff matrix) + 1 (round number) + 1 (opponent prev action) + 1 (agent prev action) + 1 (agent prev reward) + 1 (opponent prev reward)
     
     def reset(self):
         """Reset the game state."""

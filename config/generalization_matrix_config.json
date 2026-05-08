@@ -45,7 +45,7 @@
     "hidden_size": 128,
     "num_layers": 2,
     "dropout": 0.1,
-    "input_size": 6
+    "input_size": 9
   },
   
   "training_config": {

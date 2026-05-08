@@ -29,7 +29,8 @@ class GameLSTM(nn.Module):
     This architecture implements the ToM-RL framework where auxiliary prediction
     tasks create inductive bias for understanding opponent behavior.
     
-    Input format: [payoff_matrix_flattened(4), round_number(1), opponent_prev_action(1)] = 6 elements total
+    Input format: [payoff_matrix_flattened(4), round_number(1), opponent_prev_action(1), 
+                  agent_prev_action(1), agent_prev_reward(1), opponent_prev_reward(1)] = 9 elements total
     """
     
     def __init__(
@@ -41,10 +42,16 @@ class GameLSTM(nn.Module):
         num_actions: int = 2
     ):
         """
-        Initialize the GameLSTM network.
+        Initialize the GameLSTM network with separate embedding pathways.
+        
+        Architecture:
+        - Separate embeddings for each input component (allows analyzing which inputs are used)
+        - Environmental inputs: payoff_matrix, round_number
+        - Social inputs: opponent_action, agent_action, agent_reward, opponent_reward
+        - All embeddings concatenated before LSTM
         
         Args:
-            input_size: Size of input state vector
+            input_size: Size of input state vector (should be 9)
             hidden_size: Hidden size of LSTM layers
             num_layers: Number of LSTM layers
             dropout: Dropout probability
@@ -57,9 +64,55 @@ class GameLSTM(nn.Module):
         self.num_layers = num_layers
         self.num_actions = num_actions
         
-        # LSTM backbone
+        # Embedding dimension for each input component
+        # Using smaller embeddings to keep total dimension manageable
+        embed_dim = hidden_size // 6  # Divide among 6 input components
+        
+        # Separate embedding layers for each input component
+        # ENVIRONMENTAL INPUTS (task structure)
+        self.payoff_matrix_embed = nn.Sequential(
+            nn.Linear(4, embed_dim),
+            nn.ReLU(),
+            nn.LayerNorm(embed_dim)
+        )
+        
+        self.round_number_embed = nn.Sequential(
+            nn.Linear(1, embed_dim),
+            nn.ReLU(),
+            nn.LayerNorm(embed_dim)
+        )
+        
+        # SOCIAL INPUTS (opponent/agent history)
+        self.opponent_action_embed = nn.Sequential(
+            nn.Linear(1, embed_dim),
+            nn.ReLU(),
+            nn.LayerNorm(embed_dim)
+        )
+        
+        self.agent_action_embed = nn.Sequential(
+            nn.Linear(1, embed_dim),
+            nn.ReLU(),
+            nn.LayerNorm(embed_dim)
+        )
+        
+        self.agent_reward_embed = nn.Sequential(
+            nn.Linear(1, embed_dim),
+            nn.ReLU(),
+            nn.LayerNorm(embed_dim)
+        )
+        
+        self.opponent_reward_embed = nn.Sequential(
+            nn.Linear(1, embed_dim),
+            nn.ReLU(),
+            nn.LayerNorm(embed_dim)
+        )
+        
+        # Total embedding dimension after concatenation
+        total_embed_dim = embed_dim * 6
+        
+        # LSTM backbone - takes concatenated embeddings
         self.lstm = nn.LSTM(
-            input_size=input_size,
+            input_size=total_embed_dim,
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout if num_layers > 1 else 0,
@@ -124,10 +177,12 @@ class GameLSTM(nn.Module):
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
         """
-        Forward pass of the network.
+        Forward pass of the network with separate embedding pathways.
         
         Args:
-            x: Input tensor of shape (batch_size, sequence_length, input_size) or (sequence_length, input_size)
+            x: Input tensor of shape (batch_size, sequence_length, 9) or (sequence_length, 9)
+               where 9 elements are: [payoff_matrix(4), round_num(1), opp_action(1), 
+                                      agent_action(1), agent_reward(1), opp_reward(1)]
             hidden: Optional hidden state tuple (h_0, c_0)
             
         Returns:
@@ -145,6 +200,43 @@ class GameLSTM(nn.Module):
             batch_size = x.size(0)
         else:
             raise ValueError(f"Input tensor must be 2D or 3D, got {x.dim()}D tensor with shape {x.shape}")
+        
+        # Split input into components
+        # Input format: [payoff_matrix(4), round_num(1), opp_action(1), agent_action(1), agent_reward(1), opp_reward(1)]
+        payoff_matrix = x[..., 0:4]        # (batch, seq, 4)
+        round_number = x[..., 4:5]         # (batch, seq, 1)
+        opponent_action = x[..., 5:6]      # (batch, seq, 1)
+        agent_action = x[..., 6:7]         # (batch, seq, 1)
+        agent_reward = x[..., 7:8]         # (batch, seq, 1)
+        opponent_reward = x[..., 8:9]      # (batch, seq, 1)
+        
+        # Pass each component through its embedding layer
+        # Reshape for linear layers: (batch, seq, dim) -> (batch*seq, dim)
+        batch_seq = batch_size * x.size(1)
+        
+        payoff_embed = self.payoff_matrix_embed(payoff_matrix.reshape(batch_seq, 4))
+        round_embed = self.round_number_embed(round_number.reshape(batch_seq, 1))
+        opp_action_embed = self.opponent_action_embed(opponent_action.reshape(batch_seq, 1))
+        agent_action_embed = self.agent_action_embed(agent_action.reshape(batch_seq, 1))
+        agent_reward_embed = self.agent_reward_embed(agent_reward.reshape(batch_seq, 1))
+        opp_reward_embed = self.opponent_reward_embed(opponent_reward.reshape(batch_seq, 1))
+        
+        # Concatenate all embeddings
+        embed_dim = payoff_embed.size(1)
+        combined_embedding = torch.cat([
+            payoff_embed, 
+            round_embed, 
+            opp_action_embed, 
+            agent_action_embed, 
+            agent_reward_embed, 
+            opp_reward_embed
+        ], dim=1)  # (batch*seq, embed_dim*6)
+        
+        # Reshape back to (batch, seq, embed_dim*6)
+        combined_embedding = combined_embedding.reshape(batch_size, x.size(1), -1)
+        
+        # Reshape back to (batch, seq, embed_dim*6)
+        combined_embedding = combined_embedding.reshape(batch_size, x.size(1), -1)
         
         # Ensure hidden state matches the input batching
         if hidden is not None:
@@ -166,8 +258,8 @@ class GameLSTM(nn.Module):
                     c_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
                     hidden = (h_0, c_0)
         
-        # LSTM forward pass
-        lstm_out, new_hidden = self.lstm(x, hidden)
+        # LSTM forward pass with combined embeddings
+        lstm_out, new_hidden = self.lstm(combined_embedding, hidden)
         
         # Use last timestep output for predictions
         if lstm_out.dim() == 3:  # (batch_size, sequence_length, hidden_size)
