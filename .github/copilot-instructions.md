@@ -27,6 +27,56 @@ All games use **standardized 5-element state vectors**:
 # payoff_matrix: [[coop_vs_coop, coop_vs_defect], [defect_vs_coop, defect_vs_defect]]
 ```
 
+## Directory Structure
+
+The codebase follows a strict separation of concerns across directories:
+
+### Core Directories
+- **`src/cognitive_therapy_ai/`**: Core framework implementation
+  - Game logic, network architecture, training loops
+  - Loss functions, opponents, utilities
+  - **Do not** put experiment scripts or analysis code here
+
+- **`config/`**: Configuration files (JSON)
+  - Experiment parameters, network hyperparameters
+  - Default, quick test, and specialized configs
+
+- **`tests/`**: Unit tests and integration tests
+  - Framework validation scripts
+  - Quick smoke tests for modifications
+
+### Experiment Workflow Directories
+- **`experiments/`**: **Raw experimental data only**
+  - Training checkpoints (.pth files)
+  - Training logs (CSV, JSON)
+  - Raw results (PKL files)
+  - Organized by experiment name and job ID
+  - **No analysis scripts or plots**
+
+- **`analysis/`**: **All analysis scripts and notebooks**
+  - Python scripts for data analysis (`analyze_*.py`)
+  - Plotting and visualization scripts (`plot_*.py`)
+  - Jupyter notebooks for exploration (`*.ipynb`)
+  - Data validation scripts (`check_*.py`)
+  - See `analysis/analysis_guidelines.md` for best practices
+
+- **`Results/`**: **Analysis outputs only**
+  - Generated plots and figures
+  - Summary tables and statistics
+  - Analysis reports and markdown summaries
+  - **Do not** commit large binary files
+
+### Other Directories
+- **`docs/`**: Documentation and modification logs
+- **`general_scripts/`**: Utility scripts (setup, verification)
+- **`slurm_logs/`**: Cluster job logs
+- **`.github/`**: Repository configuration and copilot instructions
+
+### Workflow
+1. **Run experiments** → Data saved to `experiments/[experiment_name]/`
+2. **Analyze data** → Scripts in `analysis/`, outputs to `Results/`
+3. **Document findings** → Update markdown files in root or `docs/`
+
 ## Key Development Patterns
 
 ### Game Implementation
@@ -93,14 +143,15 @@ python main_experiment.py --game all --opponents 0.1,0.3,0.5,0.7,0.9
 python main_experiment.py --config my_config.json --adaptive-loss
 ```
 
-### Output Structure
+### Experiment Output Structure
 ```
-experiments/mixed_motive_experiment_YYYYMMDD_HHMMSS/
+experiments/[experiment_name]_YYYYMMDD_HHMMSS/
 ├── checkpoints/          # Model states (.pth files)
-├── logs/                 # Training logs
-├── plots/                # Matplotlib figures  
-├── results/              # Pickled results per game
+├── logs/                 # Training logs (CSV, JSON)
+├── results/              # Pickled results per game (PKL)
 └── experiment_config.json
+
+Note: Plots and analysis outputs go to Results/, not experiments/
 ```
 
 ## Code Conventions
@@ -199,6 +250,6 @@ The ToM-RL approach creates inductive bias for understanding opponent behavior p
 3. **Maintain clear commit history** - use descriptive commit messages
 4. **Keep the codebase organized** - follow existing patterns and structures
 5. **Focus on research implications** - connect code changes to research questions and hypotheses   
-6. **Seperate analysis code from experiemtnnt code** - use the `experiments/analysis_scripts/` directory for all analysis and visualization code, and keep it separate from the core training and experiment code in `src/`
+6. **Separate analysis from experiments** - use `analysis/` for all analysis scripts and notebooks, `experiments/` for raw data only, `Results/` for analysis outputs (plots, tables). See Directory Structure section above.
 7. **Use the configuration system** - avoid hardcoding parameters in scripts, use the existing configuration system for all experiment settings
 8. **Validate changes with tests** - use the existing test scripts for quick validation of changes
