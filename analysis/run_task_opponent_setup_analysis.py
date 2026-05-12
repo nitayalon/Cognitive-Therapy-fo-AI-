@@ -610,6 +610,294 @@ def plot_cooperation_heatmap(test_df: pd.DataFrame):
     print(f"  Saved: {output_file}")
     plt.close()
 
+def metric_3_4_kld_from_optimal(df_test, df_train):
+    """
+    Metric 3.4: KLD from optimal policy.
+    
+    For each test condition (game, opponent), compute KL divergence between 
+    each agent's policy and the optimal policy. The optimal policy is defined
+    as the final training cooperation rate of agents trained on that condition.
+    
+    KLD for Bernoulli: KL(p||q) = p*log(p/q) + (1-p)*log((1-p)/(1-q))
+    where p is test agent's cooperation rate, q is optimal agent's rate.
+    """
+    print("\nGENERATING PLOT: Metric 3.4 - KLD from Optimal Policy")
+    
+    # Define games and opponents
+    games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
+    opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
+    
+    def kl_divergence_bernoulli(p, q, epsilon=1e-10):
+        """Compute KL divergence between two Bernoulli distributions."""
+        p = np.clip(p, epsilon, 1 - epsilon)
+        q = np.clip(q, epsilon, 1 - epsilon)
+        return p * np.log(p / q) + (1 - p) * np.log((1 - p) / (1 - q))
+    
+    # Get final training cooperation rates for each condition (as optimal policies)
+    optimal_policies = {}
+    for game in games:
+        for opp in opponents:
+            # Get final epoch cooperation rate for agents trained on this condition
+            cond_data = df_train[
+                (df_train['train_game'] == game) &
+                (df_train['train_opponent'] == opp) &
+                (df_train['epoch'] == df_train['epoch'].max())  # Final epoch
+            ]
+            
+            if len(cond_data) > 0:
+                optimal_policies[(game, opp)] = cond_data['cooperation_rate'].mean()
+            else:
+                print(f"  WARNING: No training data for {game}, opp={opp}")
+    
+    # For each test condition, compute KLD from optimal
+    kld_results = []
+    
+    for test_game in games:
+        for test_opp in opponents:
+            # Get optimal policy for this test condition
+            if (test_game, test_opp) not in optimal_policies:
+                continue
+            
+            optimal_coop_rate = optimal_policies[(test_game, test_opp)]
+            
+            # Get all agents tested on this condition
+            test_agents = df_test[
+                (df_test['test_game'] == test_game) &
+                (df_test['test_opponent'] == test_opp)
+            ]
+            
+            # Compute KLD for each training condition
+            for train_game in games:
+                for train_opp in opponents:
+                    agents = test_agents[
+                        (test_agents['train_game'] == train_game) &
+                        (test_agents['train_opponent'] == train_opp)
+                    ]
+                    
+                    if len(agents) == 0:
+                        continue
+                    
+                    mean_coop = agents['cooperation_rate'].mean()
+                    kld = kl_divergence_bernoulli(mean_coop, optimal_coop_rate)
+                    
+                    kld_results.append({
+                        'train_game': train_game,
+                        'train_opponent': train_opp,
+                        'test_game': test_game,
+                        'test_opponent': test_opp,
+                        'kld': kld,
+                        'test_coop_rate': mean_coop,
+                        'optimal_coop_rate': optimal_coop_rate
+                    })
+    
+    df_kld = pd.DataFrame(kld_results)
+    
+    # Save unified data
+    kld_csv = UNIFIED_DATA_DIR / 'task_opponent_kld_from_optimal.csv'
+    df_kld.to_csv(kld_csv, index=False)
+    print(f"  Saved unified KLD data: {kld_csv.name}")
+    print(f"  KLD records: {len(df_kld)}")
+    
+    if len(df_kld) == 0:
+        print("  WARNING: No KLD data to plot (no agents tested on their training conditions)")
+        return
+    
+    # Plot: 3 rows (one per training game), x-axis grouped by test game/opponent
+    fig, axes = plt.subplots(3, 1, figsize=(15, 12))
+    
+    # Color scheme for training opponents
+    opp_colors = {0.1: '#2E86AB', 0.3: '#54A8C7', 0.5: '#9E9E9E', 0.7: '#E07A5F', 0.9: '#C1121F'}
+    game_names = {
+        'hawk-dove': 'HD',
+        'prisoners-dilemma': 'PD',
+        'stag-hunt': 'SH'
+    }
+    
+    # Sort games alphabetically
+    sorted_games = sorted(games)
+    
+    # Create x-axis positions: group by test game, then by test opponent
+    x_positions = {}
+    x_labels = []
+    x_ticks = []
+    pos = 0
+    
+    for test_game in sorted_games:
+        for test_opp in opponents:
+            x_positions[(test_game, test_opp)] = pos
+            x_labels.append(f'{game_names[test_game]}\n{test_opp:.1f}')
+            x_ticks.append(pos)
+            pos += 1
+    
+    # Get global y-axis limits for consistent scaling
+    global_kld_min = df_kld['kld'].min()
+    global_kld_max = df_kld['kld'].max()
+    y_margin = (global_kld_max - global_kld_min) * 0.05  # 5% margin
+    
+    # Plot each training game
+    for i, train_game in enumerate(sorted_games):
+        ax = axes[i]
+        
+        train_data = df_kld[df_kld['train_game'] == train_game]
+        
+        if len(train_data) == 0:
+            ax.text(0.5, 0.5, 'No Data', ha='center', va='center', fontsize=12)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            continue
+        
+        # Plot line for each training opponent
+        for train_opp in opponents:
+            opp_data = train_data[train_data['train_opponent'] == train_opp]
+            
+            if len(opp_data) == 0:
+                continue
+            
+            # Sort by test game and opponent
+            opp_data = opp_data.sort_values(['test_game', 'test_opponent'])
+            
+            # Get x positions and KLD values
+            x_vals = [x_positions[(row['test_game'], row['test_opponent'])] 
+                     for _, row in opp_data.iterrows()]
+            y_vals = opp_data['kld'].values
+            
+            ax.plot(x_vals, y_vals, marker='o', linewidth=2, markersize=6,
+                   label=f'Train opp={train_opp:.1f}', color=opp_colors[train_opp])
+        
+        # Formatting
+        ax.set_title(f'Training Game: {game_names[train_game]}', 
+                   fontsize=12, fontweight='bold')
+        ax.set_ylabel('KL Divergence', fontsize=11)
+        ax.set_xticks(x_ticks)
+        ax.set_xticklabels(x_labels if i == 2 else [''] * len(x_labels), fontsize=9, rotation=0)
+        ax.legend(fontsize=9, loc='best', ncol=5)
+        ax.grid(True, alpha=0.3)
+        
+        # Set consistent y-axis limits
+        ax.set_ylim(global_kld_min - y_margin, global_kld_max + y_margin)
+        
+        # Add vertical lines to separate games
+        for sep_pos in [4.5, 9.5]:  # Between games (5 opponents per game)
+            ax.axvline(x=sep_pos, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    
+    axes[2].set_xlabel('Test Game and Opponent Defection Probability', fontsize=11)
+    
+    plt.suptitle('Task-Opponent Setup: KL Divergence from Optimal Policy', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    
+    output_file = PLOTS_DIR / 'metric_3.4_kld_from_optimal.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"  Saved: {output_file}")
+    plt.close()
+
+def metric_3_5_cluster_analysis(df_test):
+    """
+    Metric 3.5: Cluster analysis of agents based on behavior.
+    
+    X-axis: Mean cooperation probability across all test conditions
+    Y-axis: Mean normalized reward across all test conditions
+    Color: Training opponent
+    Shape: Training game
+    """
+    print("\nGENERATING PLOT: Metric 3.5 - Cluster Analysis")
+    
+    # Compute aggregate metrics per agent (model_id)
+    agent_metrics = []
+    
+    for model_id in df_test['model_id'].unique():
+        agent_data = df_test[df_test['model_id'] == model_id]
+        
+        train_game = agent_data['train_game'].iloc[0]
+        train_opponent = agent_data['train_opponent'].iloc[0]
+        seed = agent_data['seed'].iloc[0]
+        
+        # Aggregates across all test conditions
+        mean_coop = agent_data['cooperation_rate'].mean()
+        mean_reward_norm = agent_data['normalized_reward'].mean()
+        
+        agent_metrics.append({
+            'model_id': model_id,
+            'train_game': train_game,
+            'train_opponent': train_opponent,
+            'seed': seed,
+            'mean_cooperation': mean_coop,
+            'mean_normalized_reward': mean_reward_norm
+        })
+    
+    df_cluster = pd.DataFrame(agent_metrics)
+    
+    # Save unified data
+    cluster_csv = UNIFIED_DATA_DIR / 'task_opponent_cluster_analysis.csv'
+    df_cluster.to_csv(cluster_csv, index=False)
+    print(f"  Saved unified cluster data: {cluster_csv.name}")
+    
+    # Plot scatter with different markers for games and colors for opponents
+    fig, ax = plt.subplots(figsize=(12, 9))
+    sns.set_style("whitegrid")
+    
+    # Color by opponent
+    opp_colors = {0.1: '#2E86AB', 0.3: '#54A8C7', 0.5: '#9E9E9E', 0.7: '#E07A5F', 0.9: '#C1121F'}
+    
+    # Markers by game
+    game_markers = {'prisoners-dilemma': 'o', 'hawk-dove': 's', 'stag-hunt': '^'}
+    
+    games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
+    opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
+    
+    # Plot each combination
+    for game in games:
+        for opp in opponents:
+            game_opp_data = df_cluster[
+                (df_cluster['train_game'] == game) &
+                (df_cluster['train_opponent'] == opp)
+            ]
+            
+            if len(game_opp_data) == 0:
+                continue
+            
+            ax.scatter(game_opp_data['mean_cooperation'], 
+                      game_opp_data['mean_normalized_reward'],
+                      c=[opp_colors[opp]], marker=game_markers[game], 
+                      s=150, alpha=0.7, edgecolors='black', linewidth=1.5,
+                      label=f'{game[:2].upper()}, opp={opp:.1f}')
+    
+    ax.set_xlabel('Mean Cooperation Probability (across all test conditions)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Mean Normalized Reward (across all test conditions)', fontsize=12, fontweight='bold')
+    ax.set_title('Task-Opponent Setup: Agent Clustering by Behavior', fontsize=14, fontweight='bold')
+    
+    # Create custom legend
+    from matplotlib.lines import Line2D
+    
+    # Game markers
+    game_legend = [Line2D([0], [0], marker=game_markers[g], color='w', 
+                          markerfacecolor='gray', markersize=10, label=g)
+                   for g in games]
+    
+    # Opponent colors
+    opp_legend = [Line2D([0], [0], marker='o', color='w', 
+                         markerfacecolor=opp_colors[o], markersize=10, label=f'opp={o:.1f}')
+                  for o in opponents]
+    
+    # Two legends
+    first_legend = ax.legend(handles=game_legend, title='Game', 
+                            loc='upper left', fontsize=10, title_fontsize=11)
+    ax.add_artist(first_legend)
+    ax.legend(handles=opp_legend, title='Opponent', 
+             loc='lower right', fontsize=10, title_fontsize=11)
+    
+    ax.grid(True, alpha=0.3)
+    
+    # Add reference lines at 0.5
+    ax.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    ax.axvline(x=0.5, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    
+    plt.tight_layout()
+    
+    output_file = PLOTS_DIR / 'metric_3.5_cluster_analysis.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"  Saved: {output_file}")
+    plt.close()
+
 # ============================================================================
 # MAIN EXECUTION
 # ============================================================================
@@ -646,6 +934,13 @@ def main():
     if len(test_df) > 0:
         plot_normalized_reward_heatmap(test_df)
         plot_cooperation_heatmap(test_df)
+        
+        if len(training_df) > 0:
+            metric_3_4_kld_from_optimal(test_df, training_df)
+        else:
+            print("\n⚠ Skipping KLD metric - no training data available")
+        
+        metric_3_5_cluster_analysis(test_df)
     
     # Summary
     print("\n" + "=" * 80)
@@ -656,10 +951,14 @@ def main():
     print(f"  Data:")
     print(f"    - task_opponent_training_cooperation.csv ({len(training_df)} rows)")
     print(f"    - task_opponent_test_results.csv ({len(test_df)} rows)")
+    print(f"    - task_opponent_kld_from_optimal.csv")
+    print(f"    - task_opponent_cluster_analysis.csv")
     print(f"  Plots:")
     print(f"    - cooperation_vs_epoch_3x5.png")
     print(f"    - normalized_reward_heatmap_3x5.png")
     print(f"    - cooperation_heatmap_3x5.png")
+    print(f"    - metric_3.4_kld_from_optimal.png")
+    print(f"    - metric_3.5_cluster_analysis.png")
     print("=" * 80)
 
 if __name__ == "__main__":

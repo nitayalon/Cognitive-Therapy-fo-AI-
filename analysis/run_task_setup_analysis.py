@@ -336,6 +336,284 @@ def metric_3_3_cooperation_heatmap(df_test):
     print(f"✅ Saved plot to {output_file.name}")
     plt.close()
 
+def metric_3_4_kld_from_optimal(df_test):
+    """
+    Metric 3.4: KLD from optimal policy.
+    
+    Creates two comparison plots:
+    1. KLD from task-only optimal policies (trained on same game)
+    2. KLD from task-opponent optimal policies (trained on same game+opponent)
+    
+    KLD for Bernoulli: KL(p||q) = p*log(p/q) + (1-p)*log((1-p)/(1-q))
+    where p is test agent's cooperation rate, q is optimal agent's rate.
+    """
+    print("\n" + "="*70)
+    print("GENERATING PLOT: Metric 3.4 - KLD from Optimal Policy")
+    print("="*70)
+    
+    def kl_divergence_bernoulli(p, q, epsilon=1e-10):
+        """Compute KL divergence between two Bernoulli distributions."""
+        p = np.clip(p, epsilon, 1 - epsilon)
+        q = np.clip(q, epsilon, 1 - epsilon)
+        return p * np.log(p / q) + (1 - p) * np.log((1 - p) / (1 - q))
+    
+    # Load task-opponent optimal policies from training data (final epoch)
+    task_opp_train_file = BASE_DIR / 'Results' / 'task_opponent_setup' / 'unified_data' / 'task_opponent_training_cooperation.csv'
+    if not task_opp_train_file.exists():
+        print(f"⚠️  WARNING: Task-opponent training data not found: {task_opp_train_file}")
+        task_opp_optimal = {}
+    else:
+        df_task_opp_train = pd.read_csv(task_opp_train_file)
+        # Get final epoch cooperation rates as optimal policies
+        final_epoch = df_task_opp_train['epoch'].max()
+        df_final = df_task_opp_train[df_task_opp_train['epoch'] == final_epoch]
+        
+        task_opp_optimal = {}
+        for game in GAMES:
+            for opp in OPPONENTS:
+                # Get final cooperation rate for agents trained on this game+opponent
+                optimal_agents = df_final[
+                    (df_final['train_game'] == game) &
+                    (df_final['train_opponent'] == opp)
+                ]
+                if len(optimal_agents) > 0:
+                    task_opp_optimal[(game, opp)] = optimal_agents['cooperation_rate'].mean()
+        print(f"  Loaded {len(task_opp_optimal)} task-opponent optimal policies from final training epoch")
+    
+    # Compute KLD from task-only optimal policies
+    kld_task_results = []
+    for test_game in GAMES:
+        for test_opp in OPPONENTS:
+            # Get optimal agents (trained on this game, any opponent)
+            optimal_agents = df_test[
+                (df_test['train_game'] == test_game) &
+                (df_test['test_game'] == test_game) &
+                (df_test['test_opponent'] == test_opp)
+            ]
+            
+            if len(optimal_agents) == 0:
+                continue
+            
+            optimal_coop_rate = optimal_agents['cooperation_rate'].mean()
+            
+            # Get all agents tested on this condition
+            test_agents = df_test[
+                (df_test['test_game'] == test_game) &
+                (df_test['test_opponent'] == test_opp)
+            ]
+            
+            for train_game in GAMES:
+                agents = test_agents[test_agents['train_game'] == train_game]
+                
+                if len(agents) == 0:
+                    continue
+                
+                mean_coop = agents['cooperation_rate'].mean()
+                kld = kl_divergence_bernoulli(mean_coop, optimal_coop_rate)
+                
+                kld_task_results.append({
+                    'train_game': train_game,
+                    'test_game': test_game,
+                    'test_opponent': test_opp,
+                    'kld': kld,
+                    'policy_type': 'task_only'
+                })
+    
+    # Compute KLD from task-opponent optimal policies
+    kld_task_opp_results = []
+    for test_game in GAMES:
+        for test_opp in OPPONENTS:
+            if (test_game, test_opp) not in task_opp_optimal:
+                continue
+            
+            optimal_coop_rate = task_opp_optimal[(test_game, test_opp)]
+            
+            # Get all task-only agents tested on this condition
+            test_agents = df_test[
+                (df_test['test_game'] == test_game) &
+                (df_test['test_opponent'] == test_opp)
+            ]
+            
+            for train_game in GAMES:
+                agents = test_agents[test_agents['train_game'] == train_game]
+                
+                if len(agents) == 0:
+                    continue
+                
+                mean_coop = agents['cooperation_rate'].mean()
+                kld = kl_divergence_bernoulli(mean_coop, optimal_coop_rate)
+                
+                kld_task_opp_results.append({
+                    'train_game': train_game,
+                    'test_game': test_game,
+                    'test_opponent': test_opp,
+                    'kld': kld,
+                    'policy_type': 'task_opponent'
+                })
+    
+    df_kld = pd.DataFrame(kld_task_results + kld_task_opp_results)
+    
+    # Save unified data
+    kld_csv = DATA_DIR / 'task_setup_kld_from_optimal.csv'
+    df_kld.to_csv(kld_csv, index=False)
+    print(f"✅ Saved unified KLD data: {kld_csv.name}")
+    
+    # Plot: 2 rows (task-only vs task-opponent optimal)
+    fig, axes = plt.subplots(2, 1, figsize=(16, 10))
+    sns.set_style("whitegrid")
+    
+    colors = {'hawk-dove': '#2CA02C', 'prisoners-dilemma': '#D62728', 'stag-hunt': '#1F77B4'}
+    game_names = {
+        'hawk-dove': 'HD',
+        'prisoners-dilemma': 'PD',
+        'stag-hunt': 'SH'
+    }
+    
+    # Sort games alphabetically
+    sorted_games = sorted(GAMES)
+    
+    # Create x-axis positions: group by test game, then by test opponent
+    x_positions = {}
+    x_labels = []
+    x_ticks = []
+    pos = 0
+    
+    for test_game in sorted_games:
+        for test_opp in OPPONENTS:
+            x_positions[(test_game, test_opp)] = pos
+            x_labels.append(f'{game_names[test_game]}\n{test_opp:.1f}')
+            x_ticks.append(pos)
+            pos += 1
+    
+    # Plot both policy types
+    policy_types = [('task_only', 'Task-Only Optimal Policy'), 
+                   ('task_opponent', 'Task-Opponent Optimal Policy')]
+    
+    for idx, (policy_type, title) in enumerate(policy_types):
+        ax = axes[idx]
+        
+        policy_data = df_kld[df_kld['policy_type'] == policy_type]
+        
+        if len(policy_data) == 0:
+            ax.text(0.5, 0.5, 'No Data', ha='center', va='center', fontsize=12)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            continue
+        
+        # Plot all training games on same plot
+        for train_game in sorted_games:
+            train_data = policy_data[policy_data['train_game'] == train_game]
+            
+            if len(train_data) == 0:
+                continue
+            
+            # Sort by test game and opponent
+            train_data = train_data.sort_values(['test_game', 'test_opponent'])
+            
+            # Get x positions and KLD values
+            x_vals = [x_positions[(row['test_game'], row['test_opponent'])] 
+                     for _, row in train_data.iterrows()]
+            y_vals = train_data['kld'].values
+            
+            ax.plot(x_vals, y_vals, marker='o', linewidth=2, markersize=6,
+                   color=colors[train_game], label=f'Trained on {game_names[train_game]}')
+        
+        # Formatting
+        ax.set_title(f'KLD from {title}', fontsize=12, fontweight='bold')
+        ax.set_ylabel('KL Divergence', fontsize=11)
+        ax.set_xticks(x_ticks)
+        ax.set_xticklabels(x_labels if idx == 1 else [''] * len(x_labels), fontsize=9, rotation=0)
+        ax.legend(fontsize=10, loc='best', ncol=3)
+        ax.grid(True, alpha=0.3)
+        
+        # Add vertical lines to separate games
+        for sep_pos in [4.5, 9.5]:  # Between games (5 opponents per game)
+            ax.axvline(x=sep_pos, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    
+    axes[1].set_xlabel('Test Game and Opponent Defection Probability', fontsize=11)
+    
+    plt.suptitle('Task Setup: KL Divergence from Optimal Policies', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    
+    output_file = OUTPUT_DIR / 'metric_3.4_kld_from_optimal.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"✅ Saved plot to {output_file.name}")
+    plt.close()
+
+def metric_3_5_cluster_analysis(df_test):
+    """
+    Metric 3.5: Cluster analysis of agents based on behavior.
+    
+    X-axis: Mean cooperation probability across all test conditions
+    Y-axis: Mean normalized reward across all test conditions
+    Color: Training game
+    Shape: Different markers for each game
+    """
+    print("\n" + "="*70)
+    print("GENERATING PLOT: Metric 3.5 - Cluster Analysis")
+    print("="*70)
+    
+    # Compute aggregate metrics per agent (model_id)
+    agent_metrics = []
+    
+    for model_id in df_test['model_id'].unique():
+        agent_data = df_test[df_test['model_id'] == model_id]
+        
+        train_game = agent_data['train_game'].iloc[0]
+        seed = agent_data['seed'].iloc[0]
+        
+        # Aggregates across all test conditions
+        mean_coop = agent_data['cooperation_rate'].mean()
+        mean_reward_norm = agent_data['normalized_reward'].mean()
+        
+        agent_metrics.append({
+            'model_id': model_id,
+            'train_game': train_game,
+            'seed': seed,
+            'mean_cooperation': mean_coop,
+            'mean_normalized_reward': mean_reward_norm
+        })
+    
+    df_cluster = pd.DataFrame(agent_metrics)
+    
+    # Save unified data
+    cluster_csv = DATA_DIR / 'task_setup_cluster_analysis.csv'
+    df_cluster.to_csv(cluster_csv, index=False)
+    print(f"✅ Saved unified cluster data: {cluster_csv.name}")
+    
+    # Plot scatter with different markers and colors for each game
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.set_style("whitegrid")
+    
+    colors = {'prisoners-dilemma': '#D62728', 'hawk-dove': '#2CA02C', 'stag-hunt': '#1F77B4'}
+    markers = {'prisoners-dilemma': 'o', 'hawk-dove': 's', 'stag-hunt': '^'}
+    
+    for game in GAMES:
+        game_data = df_cluster[df_cluster['train_game'] == game]
+        
+        ax.scatter(game_data['mean_cooperation'], 
+                  game_data['mean_normalized_reward'],
+                  c=colors[game], marker=markers[game], s=150, alpha=0.7,
+                  edgecolors='black', linewidth=1.5,
+                  label=f'{game}')
+    
+    ax.set_xlabel('Mean Cooperation Probability (across all test conditions)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Mean Normalized Reward (across all test conditions)', fontsize=12, fontweight='bold')
+    ax.set_title('Task Setup: Agent Clustering by Behavior', fontsize=14, fontweight='bold')
+    ax.legend(title='Trained on', fontsize=11, title_fontsize=12)
+    ax.grid(True, alpha=0.3)
+    
+    # Add reference lines at 0.5
+    ax.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    ax.axvline(x=0.5, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    
+    plt.tight_layout()
+    
+    output_file = OUTPUT_DIR / 'metric_3.5_cluster_analysis.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"✅ Saved plot to {output_file.name}")
+    plt.close()
+
 #############################################################################
 # Main Execution
 #############################################################################
@@ -356,17 +634,17 @@ def main():
     metric_3_1_cooperation_vs_epoch(df_train)
     metric_3_2_normalized_reward_heatmap(df_test)
     metric_3_3_cooperation_heatmap(df_test)
+    metric_3_4_kld_from_optimal(df_test)
+    metric_3_5_cluster_analysis(df_test)
     
-    # TODO: Implement metrics 3.4, 3.5, and 4
     print("\n" + "="*70)
     print("ANALYSIS COMPLETE")
     print("="*70)
     print(f"All outputs saved to: {OUTPUT_DIR}")
     print(f"Unified data saved to: {DATA_DIR}")
     print("\nNext steps:")
-    print("  - Implement metric 3.4 (KLD from optimal policy)")
-    print("  - Implement metric 3.5 (Cluster analysis)")
     print("  - Implement metric 4 (Representation analysis)")
+    print("  - Implement metric 4.1 (Reciprocity analysis)")
 
 if __name__ == "__main__":
     main()
