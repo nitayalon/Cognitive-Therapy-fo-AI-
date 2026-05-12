@@ -792,16 +792,17 @@ def metric_3_4_kld_from_optimal(df_test, df_train):
 
 def metric_3_5_cluster_analysis(df_test):
     """
-    Metric 3.5: Cluster analysis of agents based on behavior.
+    Metric 3.5: Cluster analysis of agents based on behavior (AGGREGATED ACROSS SEEDS).
     
+    Shows 15 aggregated conditions (3 games × 5 opponents) with error bars.
     X-axis: Mean cooperation probability across all test conditions
     Y-axis: Mean normalized reward across all test conditions
     Color: Training opponent
     Shape: Training game
     """
-    print("\nGENERATING PLOT: Metric 3.5 - Cluster Analysis")
+    print("\nGENERATING PLOT: Metric 3.5 - Cluster Analysis (Aggregated)")
     
-    # Compute aggregate metrics per agent (model_id)
+    # First compute per-agent metrics
     agent_metrics = []
     
     for model_id in df_test['model_id'].unique():
@@ -824,14 +825,29 @@ def metric_3_5_cluster_analysis(df_test):
             'mean_normalized_reward': mean_reward_norm
         })
     
-    df_cluster = pd.DataFrame(agent_metrics)
+    df_individual = pd.DataFrame(agent_metrics)
     
-    # Save unified data
-    cluster_csv = UNIFIED_DATA_DIR / 'task_opponent_cluster_analysis.csv'
+    # Aggregate across seeds for each (game, opponent) condition
+    df_cluster = df_individual.groupby(['train_game', 'train_opponent']).agg({
+        'mean_cooperation': ['mean', 'sem'],
+        'mean_normalized_reward': ['mean', 'sem']
+    }).reset_index()
+    
+    # Flatten column names
+    df_cluster.columns = ['train_game', 'train_opponent', 'coop_mean', 'coop_sem', 'reward_mean', 'reward_sem']
+    
+    print(f"  Aggregated {len(df_individual)} agents into {len(df_cluster)} conditions")
+    
+    # Save both individual and aggregated data
+    individual_csv = UNIFIED_DATA_DIR / 'task_opponent_cluster_analysis_individual.csv'
+    df_individual.to_csv(individual_csv, index=False)
+    print(f"  Saved individual agent data: {individual_csv.name}")
+    
+    cluster_csv = UNIFIED_DATA_DIR / 'task_opponent_cluster_analysis_aggregated.csv'
     df_cluster.to_csv(cluster_csv, index=False)
-    print(f"  Saved unified cluster data: {cluster_csv.name}")
+    print(f"  Saved aggregated data: {cluster_csv.name}")
     
-    # Plot scatter with different markers for games and colors for opponents
+    # Plot scatter with error bars for aggregated data (15 points)
     fig, ax = plt.subplots(figsize=(12, 9))
     sns.set_style("whitegrid")
     
@@ -844,7 +860,7 @@ def metric_3_5_cluster_analysis(df_test):
     games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
     opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
     
-    # Plot each combination
+    # Plot each condition with error bars
     for game in games:
         for opp in opponents:
             game_opp_data = df_cluster[
@@ -855,15 +871,24 @@ def metric_3_5_cluster_analysis(df_test):
             if len(game_opp_data) == 0:
                 continue
             
-            ax.scatter(game_opp_data['mean_cooperation'], 
-                      game_opp_data['mean_normalized_reward'],
-                      c=[opp_colors[opp]], marker=game_markers[game], 
-                      s=150, alpha=0.7, edgecolors='black', linewidth=1.5,
-                      label=f'{game[:2].upper()}, opp={opp:.1f}')
+            ax.errorbar(game_opp_data['coop_mean'], 
+                       game_opp_data['reward_mean'],
+                       xerr=game_opp_data['coop_sem'],
+                       yerr=game_opp_data['reward_sem'],
+                       fmt=game_markers[game], 
+                       color=opp_colors[opp],
+                       markersize=12, 
+                       alpha=0.7, 
+                       markeredgecolor='black', 
+                       markeredgewidth=1.5,
+                       capsize=4,
+                       capthick=1.5,
+                       elinewidth=1.5,
+                       label=f'{game[:2].upper()}, opp={opp:.1f}')
     
     ax.set_xlabel('Mean Cooperation Probability (across all test conditions)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Mean Normalized Reward (across all test conditions)', fontsize=12, fontweight='bold')
-    ax.set_title('Task-Opponent Setup: Agent Clustering by Behavior', fontsize=14, fontweight='bold')
+    ax.set_title('Task-Opponent Setup: Agent Clustering by Behavior (n=5 seeds/condition)', fontsize=14, fontweight='bold')
     
     # Create custom legend
     from matplotlib.lines import Line2D
@@ -896,6 +921,170 @@ def metric_3_5_cluster_analysis(df_test):
     plt.tight_layout()
     
     output_file = PLOTS_DIR / 'metric_3.5_cluster_analysis.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"  Saved: {output_file}")
+    plt.close()
+
+def metric_3_6_generalization_ratio(df_test):
+    """
+    Metric 3.6: Generalization ratio plot (AGGREGATED ACROSS SEEDS).
+    
+    X-axis: Mean cooperation probability across all test conditions
+    Y-axis: Generalization performance ratio
+            ratio = mean_reward(non_training_conditions) / mean_reward(training_condition)
+    
+    Ratio = 1.0: Perfect generalization (equal performance on non-training vs training)
+    Ratio > 1.0: Positive transfer (better on non-training than training)
+    Ratio < 1.0: Overfitting (worse on non-training than training)
+    """
+    print("\nGENERATING PLOT: Metric 3.6 - Generalization Ratio (Aggregated)")
+    
+    # Compute metrics per agent (model_id)
+    agent_metrics = []
+    
+    for model_id in df_test['model_id'].unique():
+        agent_data = df_test[df_test['model_id'] == model_id]
+        
+        train_game = agent_data['train_game'].iloc[0]
+        train_opponent = agent_data['train_opponent'].iloc[0]
+        seed = agent_data['seed'].iloc[0]
+        
+        # Calculate mean normalized reward on training condition (same game + opponent)
+        training_cond_data = agent_data[
+            (agent_data['test_game'] == train_game) &
+            (agent_data['test_opponent'] == train_opponent)
+        ]
+        mean_training_reward = training_cond_data['normalized_reward'].mean()
+        
+        # Calculate mean normalized reward on NON-training conditions (all other 14 conditions)
+        non_training_data = agent_data[
+            ~((agent_data['test_game'] == train_game) &
+              (agent_data['test_opponent'] == train_opponent))
+        ]
+        mean_non_training_reward = non_training_data['normalized_reward'].mean()
+        
+        # Calculate ratio (non-training / training performance)
+        if mean_training_reward > 0 and not np.isnan(mean_training_reward):
+            generalization_ratio = mean_non_training_reward / mean_training_reward
+        else:
+            generalization_ratio = np.nan
+        
+        # Mean cooperation across all test conditions
+        mean_coop = agent_data['cooperation_rate'].mean()
+        
+        agent_metrics.append({
+            'model_id': model_id,
+            'train_game': train_game,
+            'train_opponent': train_opponent,
+            'seed': seed,
+            'mean_cooperation': mean_coop,
+            'generalization_ratio': generalization_ratio,
+            'mean_training_reward': mean_training_reward,
+            'mean_non_training_reward': mean_non_training_reward
+        })
+    
+    df_individual = pd.DataFrame(agent_metrics)
+    
+    # Aggregate across seeds for each (game, opponent) condition
+    df_agg = df_individual.groupby(['train_game', 'train_opponent']).agg({
+        'mean_cooperation': ['mean', 'sem'],
+        'generalization_ratio': ['mean', 'sem']
+    }).reset_index()
+    
+    # Flatten column names
+    df_agg.columns = ['train_game', 'train_opponent', 'coop_mean', 'coop_sem', 'ratio_mean', 'ratio_sem']
+    
+    print(f"  Aggregated {len(df_individual)} agents into {len(df_agg)} conditions")
+    
+    # Save both individual and aggregated data
+    individual_csv = UNIFIED_DATA_DIR / 'task_opponent_generalization_ratio_individual.csv'
+    df_individual.to_csv(individual_csv, index=False)
+    print(f"  Saved individual agent data: {individual_csv.name}")
+    
+    agg_csv = UNIFIED_DATA_DIR / 'task_opponent_generalization_ratio_aggregated.csv'
+    df_agg.to_csv(agg_csv, index=False)
+    print(f"  Saved aggregated data: {agg_csv.name}")
+    
+    # Plot scatter with error bars for aggregated data (15 points)
+    fig, ax = plt.subplots(figsize=(12, 9))
+    sns.set_style("whitegrid")
+    
+    # Color by opponent
+    opp_colors = {0.1: '#2E86AB', 0.3: '#54A8C7', 0.5: '#9E9E9E', 0.7: '#E07A5F', 0.9: '#C1121F'}
+    
+    # Markers by game
+    game_markers = {'prisoners-dilemma': 'o', 'hawk-dove': 's', 'stag-hunt': '^'}
+    
+    games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
+    opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
+    
+    # Plot each condition with error bars
+    for game in games:
+        for opp in opponents:
+            game_opp_data = df_agg[
+                (df_agg['train_game'] == game) &
+                (df_agg['train_opponent'] == opp)
+            ]
+            
+            if len(game_opp_data) == 0:
+                continue
+            
+            ax.errorbar(game_opp_data['coop_mean'], 
+                       game_opp_data['ratio_mean'],
+                       xerr=game_opp_data['coop_sem'],
+                       yerr=game_opp_data['ratio_sem'],
+                       fmt=game_markers[game], 
+                       color=opp_colors[opp],
+                       markersize=12, 
+                       alpha=0.7, 
+                       markeredgecolor='black', 
+                       markeredgewidth=1.5,
+                       capsize=4,
+                       capthick=1.5,
+                       elinewidth=1.5,
+                       label=f'{game[:2].upper()}, opp={opp:.1f}')
+    
+    ax.set_xlabel('Mean Cooperation Probability (across all test conditions)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Generalization Ratio\n(Non-Training Conditions / Training Condition)', fontsize=12, fontweight='bold')
+    ax.set_title('Task-Opponent Setup: Generalization Performance (n=5 seeds/condition)', fontsize=14, fontweight='bold')
+    
+    # Create custom legend
+    from matplotlib.lines import Line2D
+    
+    # Game markers
+    game_legend = [Line2D([0], [0], marker=game_markers[g], color='w', 
+                          markerfacecolor='gray', markersize=10, label=g)
+                   for g in games]
+    
+    # Opponent colors
+    opp_legend = [Line2D([0], [0], marker='o', color='w', 
+                         markerfacecolor=opp_colors[o], markersize=10, label=f'opp={o:.1f}')
+                  for o in opponents]
+    
+    # Two legends in top right corner
+    first_legend = ax.legend(handles=game_legend, title='Game', 
+                            loc='upper right', bbox_to_anchor=(1.0, 1.0), 
+                            fontsize=10, title_fontsize=11)
+    ax.add_artist(first_legend)
+    ax.legend(handles=opp_legend, title='Opponent', 
+             loc='upper right', bbox_to_anchor=(1.0, 0.65),
+             fontsize=10, title_fontsize=11)
+    
+    ax.grid(True, alpha=0.3)
+    
+    # Add reference line at ratio = 1 (perfect generalization)
+    ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2, label='Perfect Generalization')
+    
+    # Trim y-axis to relevant range
+    all_ratios = df_agg['ratio_mean'].values
+    all_sems = df_agg['ratio_sem'].values
+    y_min = np.min(all_ratios - all_sems) * 0.95
+    y_max = np.max(all_ratios + all_sems) * 1.05
+    ax.set_ylim(y_min, y_max)
+    
+    plt.tight_layout()
+    
+    output_file = PLOTS_DIR / 'metric_3.6_generalization_ratio.png'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"  Saved: {output_file}")
     plt.close()
@@ -943,6 +1132,7 @@ def main():
             print("\n⚠ Skipping KLD metric - no training data available")
         
         metric_3_5_cluster_analysis(test_df)
+        metric_3_6_generalization_ratio(test_df)
     
     # Summary
     print("\n" + "=" * 80)

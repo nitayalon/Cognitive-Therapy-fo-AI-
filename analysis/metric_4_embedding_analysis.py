@@ -28,6 +28,8 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from typing import Dict, List, Tuple, Optional
 import pickle
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
@@ -199,11 +201,24 @@ def ablation_analysis(
         # Save original embedding
         original_embed = getattr(model, embed_attr)
         
-        # Create zero embedding (same structure)
+        # Get input and output dimensions from original embedding
+        input_dim = original_embed[0].in_features
+        output_dim = original_embed[0].out_features
+        
+        # Create zero embedding that outputs zeros with correct dimensions
+        class ZeroLinear(nn.Module):
+            def __init__(self, in_features, out_features):
+                super().__init__()
+                self.out_features = out_features
+            
+            def forward(self, x):
+                batch_size = x.shape[0]
+                return torch.zeros(batch_size, self.out_features, device=x.device)
+        
         zero_embed = nn.Sequential(
-            nn.Identity(),  # Pass through zeros
+            ZeroLinear(input_dim, output_dim),
             nn.ReLU(),
-            nn.LayerNorm(original_embed[0].out_features)
+            nn.LayerNorm(output_dim)
         ).to(device)
         
         # Replace embedding temporarily
@@ -398,8 +413,15 @@ def analyze_model_embeddings(
     """
     # Load model
     checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Extract model state dict (checkpoint may be nested)
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        state_dict = checkpoint['model_state_dict']
+    else:
+        state_dict = checkpoint
+    
     model = GameLSTM(input_size=9, hidden_size=128, num_layers=2, dropout=0.1)
-    model.load_state_dict(checkpoint)
+    model.load_state_dict(state_dict)
     model = model.to(device)
     model.eval()
     
@@ -420,3 +442,154 @@ def analyze_model_embeddings(
     results.update({f'abl_{k}': v for k, v in ablation_results.items()})
     
     return results
+
+
+#############################################################################
+# Method 5: Full Network Representation Analysis
+#############################################################################
+
+def analyze_full_network_weights(model: GameLSTM) -> Dict[str, float]:
+    """
+    Analyze weight magnitudes across the entire network, not just input embeddings.
+    
+    Returns:
+        Dictionary with L2 norms for each network component
+    """
+    results = {}
+    
+    # Input embeddings (already computed separately)
+    embed_total = 0
+    for name in ['payoff_matrix_embed', 'round_number_embed', 'opponent_action_embed',
+                 'agent_action_embed', 'agent_reward_embed', 'opponent_reward_embed']:
+        embed = getattr(model, name)
+        if isinstance(embed, nn.Sequential):
+            linear_layer = embed[0]
+            embed_total += torch.norm(linear_layer.weight).item() ** 2
+    results['input_embeddings_total'] = np.sqrt(embed_total)
+    
+    # LSTM weights
+    lstm_total = 0
+    for name, param in model.lstm.named_parameters():
+        lstm_total += torch.norm(param).item() ** 2
+    results['lstm_total'] = np.sqrt(lstm_total)
+    
+    # Separate LSTM input-hidden from hidden-hidden
+    ih_total = 0  # Input to hidden
+    hh_total = 0  # Hidden to hidden
+    for name, param in model.lstm.named_parameters():
+        if 'weight_ih' in name:
+            ih_total += torch.norm(param).item() ** 2
+        elif 'weight_hh' in name:
+            hh_total += torch.norm(param).item() ** 2
+    results['lstm_input_hidden'] = np.sqrt(ih_total)
+    results['lstm_hidden_hidden'] = np.sqrt(hh_total)
+    
+    # Output heads
+    results['policy_head'] = torch.norm(model.policy_head[0].weight).item()
+    results['opponent_pred_head'] = torch.norm(model.opponent_policy_head[0].weight).item()
+    results['value_head'] = torch.norm(model.value_head[0].weight).item()
+    
+    # Total network magnitude
+    total = 0
+    for param in model.parameters():
+        total += torch.norm(param).item() ** 2
+    results['total_network'] = np.sqrt(total)
+    
+    return results
+
+
+def extract_hidden_state_representations(
+    model: GameLSTM,
+    states_tensor: torch.Tensor,
+    device: str = 'cpu'
+) -> np.ndarray:
+    """
+    Extract LSTM hidden states across test states.
+    These capture the full learned representation, not just input processing.
+    
+    Args:
+        model: Trained network
+        states_tensor: Test states (N, 9)
+        device: Device
+        
+    Returns:
+        Hidden states (N, hidden_size)
+    """
+    model.eval()
+    model = model.to(device)
+    states = states_tensor.to(device).unsqueeze(1)  # Add sequence dimension
+    
+    with torch.no_grad():
+        hidden = None
+        _, _, _, (h_n, c_n) = model(states, hidden)
+        # h_n shape: (num_layers, batch, hidden_size)
+        # Take last layer's hidden state
+        hidden_states = h_n[-1, :, :].cpu().numpy()
+    
+    return hidden_states
+
+
+def compute_representational_similarity(
+    hidden_states_1: np.ndarray,
+    hidden_states_2: np.ndarray,
+    method: str = 'cka'
+) -> float:
+    """
+    Compute similarity between two sets of representations.
+    
+    Methods:
+    - 'cka': Centered Kernel Alignment (scale-invariant, rotation-invariant)
+    - 'correlation': Mean correlation between dimensions
+    - 'cosine': Mean cosine similarity across states
+    
+    Args:
+        hidden_states_1: (N, D) representations from model 1
+        hidden_states_2: (N, D) representations from model 2
+        method: Similarity metric
+        
+    Returns:
+        Similarity score in [0, 1]
+    """
+    if method == 'cka':
+        # Centered Kernel Alignment
+        def centering(K):
+            n = K.shape[0]
+            unit = np.ones([n, n])
+            I = np.eye(n)
+            H = I - unit / n
+            return np.dot(np.dot(H, K), H)
+        
+        def linear_kernel(X, Y):
+            return X @ Y.T
+        
+        K1 = linear_kernel(hidden_states_1, hidden_states_1)
+        K2 = linear_kernel(hidden_states_2, hidden_states_2)
+        K12 = linear_kernel(hidden_states_1, hidden_states_2)
+        
+        K1_centered = centering(K1)
+        K2_centered = centering(K2)
+        K12_centered = centering(K12)
+        
+        hsic = np.sum(K1_centered * K2_centered)
+        var1 = np.sqrt(np.sum(K1_centered * K1_centered))
+        var2 = np.sqrt(np.sum(K2_centered * K2_centered))
+        
+        cka = hsic / (var1 * var2 + 1e-10)
+        return max(0, min(1, cka))  # Clip to [0, 1]
+    
+    elif method == 'correlation':
+        # Mean absolute correlation between dimensions
+        corr_matrix = np.corrcoef(hidden_states_1.T, hidden_states_2.T)
+        n_dims = hidden_states_1.shape[1]
+        cross_corr = corr_matrix[:n_dims, n_dims:]
+        return np.abs(cross_corr).mean()
+    
+    elif method == 'cosine':
+        # Mean cosine similarity across states
+        from sklearn.metrics.pairwise import cosine_similarity
+        cos_sim = cosine_similarity(hidden_states_1, hidden_states_2)
+        return np.diag(cos_sim).mean()
+    
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
