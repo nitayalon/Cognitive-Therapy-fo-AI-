@@ -64,6 +64,13 @@ PAYOFF_MATRICES = {
     }
 }
 
+# Display names for plots
+GAME_DISPLAY_NAMES = {
+    'prisoners-dilemma': 'PD',
+    'hawk-dove': 'HD',
+    'stag-hunt': 'SH'
+}
+
 # ============================================================================
 # TASK-TO-CONDITION MAPPING
 # ============================================================================
@@ -925,19 +932,18 @@ def metric_3_5_cluster_analysis(df_test):
     print(f"  Saved: {output_file}")
     plt.close()
 
-def metric_3_6_generalization_ratio(df_test):
+def metric_3_6a_cross_generalization_analysis(df_test):
     """
-    Metric 3.6: Generalization ratio plot (AGGREGATED ACROSS SEEDS).
+    Metric 3.6a: Cross-generalization analysis (AGGREGATED ACROSS SEEDS).
     
-    X-axis: Mean cooperation probability across all test conditions
-    Y-axis: Generalization performance ratio
-            ratio = mean_reward(non_training_conditions) / mean_reward(training_condition)
+    Categorizes test performance by generalization type:
+    - Same game, different opponent
+    - Different game, same opponent
+    - Different game, different opponent
     
-    Ratio = 1.0: Perfect generalization (equal performance on non-training vs training)
-    Ratio > 1.0: Positive transfer (better on non-training than training)
-    Ratio < 1.0: Overfitting (worse on non-training than training)
+    NOTE: Training condition performance is not available (by design).
     """
-    print("\nGENERATING PLOT: Metric 3.6 - Generalization Ratio (Aggregated)")
+    print("\nGENERATING PLOT: Metric 3.6a - Cross-Generalization Analysis (Aggregated)")
     
     # Compute metrics per agent (model_id)
     agent_metrics = []
@@ -949,63 +955,180 @@ def metric_3_6_generalization_ratio(df_test):
         train_opponent = agent_data['train_opponent'].iloc[0]
         seed = agent_data['seed'].iloc[0]
         
-        # Calculate mean normalized reward on training condition (same game + opponent)
-        training_cond_data = agent_data[
+        # Categorize test conditions
+        same_game_diff_opp = agent_data[
             (agent_data['test_game'] == train_game) &
+            (agent_data['test_opponent'] != train_opponent)
+        ]['normalized_reward'].mean()
+        
+        diff_game_same_opp = agent_data[
+            (agent_data['test_game'] != train_game) &
             (agent_data['test_opponent'] == train_opponent)
-        ]
-        mean_training_reward = training_cond_data['normalized_reward'].mean()
+        ]['normalized_reward'].mean()
         
-        # Calculate mean normalized reward on NON-training conditions (all other 14 conditions)
-        non_training_data = agent_data[
-            ~((agent_data['test_game'] == train_game) &
-              (agent_data['test_opponent'] == train_opponent))
-        ]
-        mean_non_training_reward = non_training_data['normalized_reward'].mean()
-        
-        # Calculate ratio (non-training / training performance)
-        if mean_training_reward > 0 and not np.isnan(mean_training_reward):
-            generalization_ratio = mean_non_training_reward / mean_training_reward
-        else:
-            generalization_ratio = np.nan
-        
-        # Mean cooperation across all test conditions
-        mean_coop = agent_data['cooperation_rate'].mean()
+        diff_game_diff_opp = agent_data[
+            (agent_data['test_game'] != train_game) &
+            (agent_data['test_opponent'] != train_opponent)
+        ]['normalized_reward'].mean()
         
         agent_metrics.append({
             'model_id': model_id,
             'train_game': train_game,
             'train_opponent': train_opponent,
             'seed': seed,
-            'mean_cooperation': mean_coop,
-            'generalization_ratio': generalization_ratio,
-            'mean_training_reward': mean_training_reward,
-            'mean_non_training_reward': mean_non_training_reward
+            'same_game_diff_opp': same_game_diff_opp,
+            'diff_game_same_opp': diff_game_same_opp,
+            'diff_game_diff_opp': diff_game_diff_opp
         })
     
     df_individual = pd.DataFrame(agent_metrics)
     
     # Aggregate across seeds for each (game, opponent) condition
     df_agg = df_individual.groupby(['train_game', 'train_opponent']).agg({
-        'mean_cooperation': ['mean', 'sem'],
-        'generalization_ratio': ['mean', 'sem']
+        'same_game_diff_opp': ['mean', 'sem'],
+        'diff_game_same_opp': ['mean', 'sem'],
+        'diff_game_diff_opp': ['mean', 'sem']
     }).reset_index()
     
     # Flatten column names
-    df_agg.columns = ['train_game', 'train_opponent', 'coop_mean', 'coop_sem', 'ratio_mean', 'ratio_sem']
+    df_agg.columns = ['train_game', 'train_opponent', 
+                      'same_game_mean', 'same_game_sem',
+                      'same_opp_mean', 'same_opp_sem',
+                      'diff_both_mean', 'diff_both_sem']
     
     print(f"  Aggregated {len(df_individual)} agents into {len(df_agg)} conditions")
     
-    # Save both individual and aggregated data
-    individual_csv = UNIFIED_DATA_DIR / 'task_opponent_generalization_ratio_individual.csv'
+    # Save data
+    individual_csv = UNIFIED_DATA_DIR / 'task_opponent_cross_generalization_individual.csv'
     df_individual.to_csv(individual_csv, index=False)
     print(f"  Saved individual agent data: {individual_csv.name}")
     
-    agg_csv = UNIFIED_DATA_DIR / 'task_opponent_generalization_ratio_aggregated.csv'
+    agg_csv = UNIFIED_DATA_DIR / 'task_opponent_cross_generalization_aggregated.csv'
     df_agg.to_csv(agg_csv, index=False)
     print(f"  Saved aggregated data: {agg_csv.name}")
     
-    # Plot scatter with error bars for aggregated data (15 points)
+    # Create grouped bar plot
+    fig, ax = plt.subplots(figsize=(14, 8))
+    
+    # Prepare data for grouped bars
+    conditions = []
+    for _, row in df_agg.iterrows():
+        game_abbrev = GAME_DISPLAY_NAMES[row['train_game']]
+        conditions.append(f"{game_abbrev}\n{row['train_opponent']:.1f}")
+    
+    x = np.arange(len(conditions))
+    width = 0.25
+    
+    # Plot three bars per condition
+    bars1 = ax.bar(x - width, df_agg['same_game_mean'], width, 
+                   yerr=df_agg['same_game_sem'], capsize=3,
+                   label='Same game, diff opponent', color='#3498db', alpha=0.8)
+    bars2 = ax.bar(x, df_agg['same_opp_mean'], width,
+                   yerr=df_agg['same_opp_sem'], capsize=3,
+                   label='Diff game, same opponent', color='#2ecc71', alpha=0.8)
+    bars3 = ax.bar(x + width, df_agg['diff_both_mean'], width,
+                   yerr=df_agg['diff_both_sem'], capsize=3,
+                   label='Diff game, diff opponent', color='#e74c3c', alpha=0.8)
+    
+    ax.set_xlabel('Training Condition (Game, Opponent)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Mean Normalized Reward', fontsize=12, fontweight='bold')
+    ax.set_title('Cross-Generalization Analysis: Performance by Transfer Type\n(n=5 seeds/condition)', 
+                 fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(conditions, fontsize=9)
+    ax.legend(fontsize=11, loc='best')
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    plt.tight_layout()
+    
+    output_file = PLOTS_DIR / 'metric_3.6a_cross_generalization_analysis.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"  Saved: {output_file}")
+    plt.close()
+
+
+def metric_3_6b_training_relative_performance(df_test, df_training):
+    """
+    Metric 3.6b: Generalization relative to training performance (AGGREGATED ACROSS SEEDS).
+    
+    Compares mean test performance to final training performance:
+    ratio = mean_test_reward / final_training_reward
+    
+    Ratio = 1.0: Test performance equals training performance
+    Ratio > 1.0: Positive transfer (better on test than training achieved)
+    Ratio < 1.0: Performance drop on test conditions
+    """
+    print("\nGENERATING PLOT: Metric 3.6b - Training-Relative Performance (Aggregated)")
+    
+    # Extract final training performance per agent
+    final_training = df_training.groupby('task_id').agg({
+        'cumulative_reward': 'last'  # Last epoch's cumulative reward
+    }).reset_index()
+    final_training.columns = ['model_id', 'final_training_reward']
+    
+    # Compute metrics per agent
+    agent_metrics = []
+    
+    for model_id in df_test['model_id'].unique():
+        agent_data = df_test[df_test['model_id'] == model_id]
+        
+        train_game = agent_data['train_game'].iloc[0]
+        train_opponent = agent_data['train_opponent'].iloc[0]
+        seed = agent_data['seed'].iloc[0]
+        
+        # Get final training reward
+        training_row = final_training[final_training['model_id'] == model_id]
+        if len(training_row) > 0:
+            final_train_reward = training_row['final_training_reward'].iloc[0]
+        else:
+            final_train_reward = np.nan
+        
+        # Calculate mean test performance (all 14 non-training conditions)
+        mean_test_reward = agent_data['mean_reward'].mean()
+        
+        # Calculate ratio
+        if final_train_reward > 0 and not np.isnan(final_train_reward):
+            performance_ratio = mean_test_reward / final_train_reward
+        else:
+            performance_ratio = np.nan
+        
+        agent_metrics.append({
+            'model_id': model_id,
+            'train_game': train_game,
+            'train_opponent': train_opponent,
+            'seed': seed,
+            'final_training_reward': final_train_reward,
+            'mean_test_reward': mean_test_reward,
+            'performance_ratio': performance_ratio
+        })
+    
+    df_individual = pd.DataFrame(agent_metrics)
+    
+    # Aggregate across seeds for each (game, opponent) condition
+    df_agg = df_individual.groupby(['train_game', 'train_opponent']).agg({
+        'performance_ratio': ['mean', 'sem'],
+        'final_training_reward': ['mean', 'sem'],
+        'mean_test_reward': ['mean', 'sem']
+    }).reset_index()
+    
+    # Flatten column names
+    df_agg.columns = ['train_game', 'train_opponent',
+                      'ratio_mean', 'ratio_sem',
+                      'train_reward_mean', 'train_reward_sem',
+                      'test_reward_mean', 'test_reward_sem']
+    
+    print(f"  Aggregated {len(df_individual)} agents into {len(df_agg)} conditions")
+    
+    # Save data
+    individual_csv = UNIFIED_DATA_DIR / 'task_opponent_training_relative_performance_individual.csv'
+    df_individual.to_csv(individual_csv, index=False)
+    print(f"  Saved individual agent data: {individual_csv.name}")
+    
+    agg_csv = UNIFIED_DATA_DIR / 'task_opponent_training_relative_performance_aggregated.csv'
+    df_agg.to_csv(agg_csv, index=False)
+    print(f"  Saved aggregated data: {agg_csv.name}")
+    
+    # Plot scatter with error bars
     fig, ax = plt.subplots(figsize=(12, 9))
     sns.set_style("whitegrid")
     
@@ -1018,7 +1141,7 @@ def metric_3_6_generalization_ratio(df_test):
     games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
     opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
     
-    # Plot each condition with error bars
+    # Plot each condition
     for game in games:
         for opp in opponents:
             game_opp_data = df_agg[
@@ -1029,9 +1152,11 @@ def metric_3_6_generalization_ratio(df_test):
             if len(game_opp_data) == 0:
                 continue
             
-            ax.errorbar(game_opp_data['coop_mean'], 
+            game_abbrev = GAME_DISPLAY_NAMES[game]
+            
+            ax.errorbar(game_opp_data['train_reward_mean'], 
                        game_opp_data['ratio_mean'],
-                       xerr=game_opp_data['coop_sem'],
+                       xerr=game_opp_data['train_reward_sem'],
                        yerr=game_opp_data['ratio_sem'],
                        fmt=game_markers[game], 
                        color=opp_colors[opp],
@@ -1042,11 +1167,12 @@ def metric_3_6_generalization_ratio(df_test):
                        capsize=4,
                        capthick=1.5,
                        elinewidth=1.5,
-                       label=f'{game[:2].upper()}, opp={opp:.1f}')
+                       label=f'{game_abbrev}, opp={opp:.1f}')
     
-    ax.set_xlabel('Mean Cooperation Probability (across all test conditions)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Generalization Ratio\n(Non-Training Conditions / Training Condition)', fontsize=12, fontweight='bold')
-    ax.set_title('Task-Opponent Setup: Generalization Performance (n=5 seeds/condition)', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Final Training Reward (last epoch)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Performance Ratio\n(Mean Test Reward / Final Training Reward)', fontsize=12, fontweight='bold')
+    ax.set_title('Training-Relative Generalization Performance\n(n=5 seeds/condition)', 
+                 fontsize=14, fontweight='bold')
     
     # Create custom legend
     from matplotlib.lines import Line2D
@@ -1061,7 +1187,7 @@ def metric_3_6_generalization_ratio(df_test):
                          markerfacecolor=opp_colors[o], markersize=10, label=f'opp={o:.1f}')
                   for o in opponents]
     
-    # Two legends in top right corner
+    # Two legends
     first_legend = ax.legend(handles=game_legend, title='Game', 
                             loc='upper right', bbox_to_anchor=(1.0, 1.0), 
                             fontsize=10, title_fontsize=11)
@@ -1072,20 +1198,18 @@ def metric_3_6_generalization_ratio(df_test):
     
     ax.grid(True, alpha=0.3)
     
-    # Add reference line at ratio = 1 (perfect generalization)
-    ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2, label='Perfect Generalization')
+    # Add reference line at ratio = 1
+    ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2)
     
-    # Trim y-axis to relevant range (filter out NaN values)
+    # Trim y-axis (filter out NaN)
     all_ratios = df_agg['ratio_mean'].values
     all_sems = df_agg['ratio_sem'].values
     
-    # Filter out NaN values before computing limits
     valid_lower = all_ratios - all_sems
     valid_upper = all_ratios + all_sems
     valid_lower_clean = valid_lower[~np.isnan(valid_lower)]
     valid_upper_clean = valid_upper[~np.isnan(valid_upper)]
     
-    # Only set limits if we have valid data
     if len(valid_lower_clean) > 0 and len(valid_upper_clean) > 0:
         y_min = np.min(valid_lower_clean) * 0.95
         y_max = np.max(valid_upper_clean) * 1.05
@@ -1093,7 +1217,7 @@ def metric_3_6_generalization_ratio(df_test):
     
     plt.tight_layout()
     
-    output_file = PLOTS_DIR / 'metric_3.6_generalization_ratio.png'
+    output_file = PLOTS_DIR / 'metric_3.6b_training_relative_performance.png'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"  Saved: {output_file}")
     plt.close()
@@ -1141,7 +1265,12 @@ def main():
             print("\n⚠ Skipping KLD metric - no training data available")
         
         metric_3_5_cluster_analysis(test_df)
-        metric_3_6_generalization_ratio(test_df)
+        metric_3_6a_cross_generalization_analysis(test_df)
+        
+        if len(training_df) > 0:
+            metric_3_6b_training_relative_performance(test_df, training_df)
+        else:
+            print("\n⚠ Skipping metric 3.6b - no training data available")
     
     # Summary
     print("\n" + "=" * 80)
