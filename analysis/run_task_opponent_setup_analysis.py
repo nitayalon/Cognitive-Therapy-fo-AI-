@@ -201,21 +201,25 @@ def extract_training_data() -> pd.DataFrame:
         
         train_game, train_opponent = CONDITION_TO_GAME_OPP[cond_id]
         
+        # Create unique task_id from condition_id and seed (0-74)
+        # Each condition has 5 seeds: task_id = condition_id * 5 + seed
+        unique_task_id = cond_id * 5 + seed
+        
         # Find task directories
         task_dirs = sorted(cond_dir.glob("generalization_matrix_task_*"))
         
         for task_dir in task_dirs:
-            # Parse task_id from directory name (format: generalization_matrix_task_X_TIMESTAMP)
+            # Parse original task_id from directory name for metrics file
             task_name = task_dir.name
             try:
-                task_id = int(task_name.split('_')[3])
+                original_task_id = int(task_name.split('_')[3])
             except (IndexError, ValueError):
                 print(f"  WARNING: Could not parse task_id from: {task_name}")
                 continue
             
-            # Load training metrics CSV
+            # Load training metrics CSV (using original task_id for filename)
             results_dir = task_dir / "results"
-            metrics_file = results_dir / f"training_task_{task_id}_metrics.csv"
+            metrics_file = results_dir / f"training_task_{original_task_id}_metrics.csv"
             
             if not metrics_file.exists():
                 print(f"  WARNING: Metrics file not found: {metrics_file}")
@@ -224,10 +228,10 @@ def extract_training_data() -> pd.DataFrame:
             try:
                 df = pd.read_csv(metrics_file)
                 
-                # Extract required columns
+                # Extract required columns (use unique_task_id for data)
                 for _, row in df.iterrows():
                     all_training_data.append({
-                        'task_id': task_id,
+                        'task_id': unique_task_id,  # Use unique task_id
                         'train_game': train_game,
                         'train_opponent': train_opponent,
                         'seed': seed,
@@ -1049,22 +1053,24 @@ def metric_3_6a_cross_generalization_analysis(df_test):
 
 def metric_3_6b_training_relative_performance(df_test, df_training):
     """
-    Metric 3.6b: Generalization relative to training performance (AGGREGATED ACROSS SEEDS).
+    Metric 3.6b: Cross-task generalization ratio (AGGREGATED ACROSS SEEDS).
     
-    Compares mean test performance to final training performance:
-    ratio = mean_test_reward / final_training_reward
+    X-axis: Final training cooperation rate (last epoch)
+    Y-axis: Cross-task ratio = mean(other_tasks_reward) / mean(same_task_reward)
     
-    Ratio = 1.0: Test performance equals training performance
-    Ratio > 1.0: Positive transfer (better on test than training achieved)
-    Ratio < 1.0: Performance drop on test conditions
+    Where:
+    - same_task_reward: Test performance on same game as training (different opponents)
+    - other_tasks_reward: Test performance on different games (all opponents)
+    
+    Shows how well agents generalize across tasks vs. within the same task.
     """
-    print("\nGENERATING PLOT: Metric 3.6b - Training-Relative Performance (Aggregated)")
+    print("\nGENERATING PLOT: Metric 3.6b - Cross-Task Generalization Ratio (Aggregated)")
     
-    # Extract final training performance per agent
+    # Extract final training cooperation rate per agent
     final_training = df_training.groupby('task_id').agg({
-        'cumulative_reward': 'last'  # Last epoch's cumulative reward
+        'cooperation_rate': 'last'
     }).reset_index()
-    final_training.columns = ['model_id', 'final_training_reward']
+    final_training.columns = ['model_id', 'final_training_coop']
     
     # Compute metrics per agent
     agent_metrics = []
@@ -1076,46 +1082,54 @@ def metric_3_6b_training_relative_performance(df_test, df_training):
         train_opponent = agent_data['train_opponent'].iloc[0]
         seed = agent_data['seed'].iloc[0]
         
-        # Get final training reward
+        # Get final training cooperation rate
         training_row = final_training[final_training['model_id'] == model_id]
         if len(training_row) > 0:
-            final_train_reward = training_row['final_training_reward'].iloc[0]
+            final_train_coop = training_row['final_training_coop'].iloc[0]
         else:
-            final_train_reward = np.nan
+            final_train_coop = np.nan
         
-        # Calculate mean test performance (all 14 non-training conditions)
-        mean_test_reward = agent_data['mean_reward'].mean()
+        # Split test data into same task and other tasks
+        same_task_data = agent_data[agent_data['test_game'] == train_game]
+        other_tasks_data = agent_data[agent_data['test_game'] != train_game]
         
-        # Calculate ratio
-        if final_train_reward > 0 and not np.isnan(final_train_reward):
-            performance_ratio = mean_test_reward / final_train_reward
+        # Calculate mean normalized rewards
+        mean_same_task_reward = same_task_data['normalized_reward'].mean()
+        mean_other_tasks_reward = other_tasks_data['normalized_reward'].mean()
+        
+        # Calculate ratio (other tasks / same task)
+        if mean_same_task_reward > 0 and not np.isnan(mean_same_task_reward):
+            cross_task_ratio = mean_other_tasks_reward / mean_same_task_reward
         else:
-            performance_ratio = np.nan
+            cross_task_ratio = np.nan
         
         agent_metrics.append({
             'model_id': model_id,
             'train_game': train_game,
             'train_opponent': train_opponent,
             'seed': seed,
-            'final_training_reward': final_train_reward,
-            'mean_test_reward': mean_test_reward,
-            'performance_ratio': performance_ratio
+            'final_training_coop': final_train_coop,
+            'mean_same_task_reward': mean_same_task_reward,
+            'mean_other_tasks_reward': mean_other_tasks_reward,
+            'cross_task_ratio': cross_task_ratio
         })
     
     df_individual = pd.DataFrame(agent_metrics)
     
     # Aggregate across seeds for each (game, opponent) condition
     df_agg = df_individual.groupby(['train_game', 'train_opponent']).agg({
-        'performance_ratio': ['mean', 'sem'],
-        'final_training_reward': ['mean', 'sem'],
-        'mean_test_reward': ['mean', 'sem']
+        'cross_task_ratio': ['mean', 'sem'],
+        'final_training_coop': ['mean', 'sem'],
+        'mean_same_task_reward': ['mean', 'sem'],
+        'mean_other_tasks_reward': ['mean', 'sem']
     }).reset_index()
     
     # Flatten column names
     df_agg.columns = ['train_game', 'train_opponent',
                       'ratio_mean', 'ratio_sem',
-                      'train_reward_mean', 'train_reward_sem',
-                      'test_reward_mean', 'test_reward_sem']
+                      'train_coop_mean', 'train_coop_sem',
+                      'same_task_reward_mean', 'same_task_reward_sem',
+                      'other_tasks_reward_mean', 'other_tasks_reward_sem']
     
     print(f"  Aggregated {len(df_individual)} agents into {len(df_agg)} conditions")
     
@@ -1128,15 +1142,15 @@ def metric_3_6b_training_relative_performance(df_test, df_training):
     df_agg.to_csv(agg_csv, index=False)
     print(f"  Saved aggregated data: {agg_csv.name}")
     
-    # Plot scatter with error bars
+    # Plot scatter with error bars - X-axis is cooperation rate, Y-axis is performance ratio
     fig, ax = plt.subplots(figsize=(12, 9))
     sns.set_style("whitegrid")
     
+    # Markers by game (task)
+    game_markers = {'prisoners-dilemma': 'o', 'hawk-dove': 's', 'stag-hunt': '^'}
+    
     # Color by opponent
     opp_colors = {0.1: '#2E86AB', 0.3: '#54A8C7', 0.5: '#9E9E9E', 0.7: '#E07A5F', 0.9: '#C1121F'}
-    
-    # Markers by game
-    game_markers = {'prisoners-dilemma': 'o', 'hawk-dove': 's', 'stag-hunt': '^'}
     
     games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
     opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
@@ -1154,9 +1168,9 @@ def metric_3_6b_training_relative_performance(df_test, df_training):
             
             game_abbrev = GAME_DISPLAY_NAMES[game]
             
-            ax.errorbar(game_opp_data['train_reward_mean'], 
+            ax.errorbar(game_opp_data['train_coop_mean'], 
                        game_opp_data['ratio_mean'],
-                       xerr=game_opp_data['train_reward_sem'],
+                       xerr=game_opp_data['train_coop_sem'],
                        yerr=game_opp_data['ratio_sem'],
                        fmt=game_markers[game], 
                        color=opp_colors[opp],
@@ -1169,51 +1183,58 @@ def metric_3_6b_training_relative_performance(df_test, df_training):
                        elinewidth=1.5,
                        label=f'{game_abbrev}, opp={opp:.1f}')
     
-    ax.set_xlabel('Final Training Reward (last epoch)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Performance Ratio\n(Mean Test Reward / Final Training Reward)', fontsize=12, fontweight='bold')
-    ax.set_title('Training-Relative Generalization Performance\n(n=5 seeds/condition)', 
+    ax.set_xlabel('Final Training Cooperation Rate (last epoch)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Cross-Task Generalization Ratio\n(Other Tasks Reward / Same Task Reward)', fontsize=12, fontweight='bold')
+    ax.set_title('Cross-Task Generalization Performance\n(n=5 seeds/condition)', 
                  fontsize=14, fontweight='bold')
     
     # Create custom legend
     from matplotlib.lines import Line2D
     
-    # Game markers
+    # Game markers (shapes)
     game_legend = [Line2D([0], [0], marker=game_markers[g], color='w', 
-                          markerfacecolor='gray', markersize=10, label=g)
+                          markerfacecolor='gray', markersize=10, 
+                          label=GAME_DISPLAY_NAMES[g], markeredgecolor='black', markeredgewidth=1.5)
                    for g in games]
     
     # Opponent colors
     opp_legend = [Line2D([0], [0], marker='o', color='w', 
-                         markerfacecolor=opp_colors[o], markersize=10, label=f'opp={o:.1f}')
+                         markerfacecolor=opp_colors[o], markersize=10, label=f'opp={o:.1f}',
+                         markeredgecolor='black', markeredgewidth=1.5)
                   for o in opponents]
     
-    # Two legends
+    # Two legends - positioned in top right corner
     first_legend = ax.legend(handles=game_legend, title='Game', 
-                            loc='upper right', bbox_to_anchor=(1.0, 1.0), 
+                            loc='upper right', bbox_to_anchor=(0.98, 0.98), 
                             fontsize=10, title_fontsize=11)
     ax.add_artist(first_legend)
     ax.legend(handles=opp_legend, title='Opponent', 
-             loc='upper right', bbox_to_anchor=(1.0, 0.65),
+             loc='upper right', bbox_to_anchor=(0.98, 0.73),
              fontsize=10, title_fontsize=11)
     
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=0.3, which='both')
     
-    # Add reference line at ratio = 1
-    ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2)
+    # Set axis limits
+    ax.set_xlim(-0.05, 1.05)  # Cooperation rate is 0-1
     
-    # Trim y-axis (filter out NaN)
+    # Use linear scale with custom ticks starting from 0.5, spaced at 0.25
     all_ratios = df_agg['ratio_mean'].values
-    all_sems = df_agg['ratio_sem'].values
+    valid_ratios = all_ratios[~np.isnan(all_ratios)]
     
-    valid_lower = all_ratios - all_sems
-    valid_upper = all_ratios + all_sems
-    valid_lower_clean = valid_lower[~np.isnan(valid_lower)]
-    valid_upper_clean = valid_upper[~np.isnan(valid_upper)]
+    if len(valid_ratios) > 0:
+        y_max = np.max(valid_ratios) * 1.1
+        # Round up to nearest 0.25
+        y_max = np.ceil(y_max * 4) / 4
+    else:
+        y_max = 1.5
     
-    if len(valid_lower_clean) > 0 and len(valid_upper_clean) > 0:
-        y_min = np.min(valid_lower_clean) * 0.95
-        y_max = np.max(valid_upper_clean) * 1.05
-        ax.set_ylim(y_min, y_max)
+    # Set y-axis ticks at 0.25 intervals starting from 0.5
+    y_ticks = np.arange(0.5, y_max + 0.01, 0.25)
+    ax.set_yticks(y_ticks)
+    ax.set_ylim(0.5, y_max)
+    
+    # Add reference line at ratio = 1.0
+    ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2, label='ratio=1.0')
     
     plt.tight_layout()
     
