@@ -747,12 +747,21 @@ def metric_3_6_generalization_ratio(df_test):
     # Add reference line at ratio = 1 (perfect generalization)
     ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2, label='Perfect Generalization')
     
-    # Trim y-axis to relevant range
+    # Trim y-axis to relevant range (filter out NaN values)
     all_ratios = df_agg['ratio_mean'].values
     all_sems = df_agg['ratio_sem'].values
-    y_min = np.min(all_ratios - all_sems) * 0.95
-    y_max = np.max(all_ratios + all_sems) * 1.05
-    ax.set_ylim(y_min, y_max)
+    
+    # Filter out NaN values before computing limits
+    valid_lower = all_ratios - all_sems
+    valid_upper = all_ratios + all_sems
+    valid_lower_clean = valid_lower[~np.isnan(valid_lower)]
+    valid_upper_clean = valid_upper[~np.isnan(valid_upper)]
+    
+    # Only set limits if we have valid data
+    if len(valid_lower_clean) > 0 and len(valid_upper_clean) > 0:
+        y_min = np.min(valid_lower_clean) * 0.95
+        y_max = np.max(valid_upper_clean) * 1.05
+        ax.set_ylim(y_min, y_max)
     
     plt.tight_layout()
     
