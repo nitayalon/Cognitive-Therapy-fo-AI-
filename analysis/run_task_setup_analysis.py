@@ -600,7 +600,7 @@ def metric_3_5_cluster_analysis(df_test):
     ax.set_xlabel('Mean Cooperation Probability (across all test conditions)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Mean Normalized Reward (across all test conditions)', fontsize=12, fontweight='bold')
     ax.set_title('Task Setup: Agent Clustering by Behavior', fontsize=14, fontweight='bold')
-    ax.legend(title='Trained on', fontsize=11, title_fontsize=12)
+    ax.legend(title='Trained on', fontsize=11, title_fontsize=12, loc='upper right')
     ax.grid(True, alpha=0.3)
     
     # Add reference lines at 0.5

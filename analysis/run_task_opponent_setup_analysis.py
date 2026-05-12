@@ -878,12 +878,14 @@ def metric_3_5_cluster_analysis(df_test):
                          markerfacecolor=opp_colors[o], markersize=10, label=f'opp={o:.1f}')
                   for o in opponents]
     
-    # Two legends
+    # Two legends in top right corner
     first_legend = ax.legend(handles=game_legend, title='Game', 
-                            loc='upper left', fontsize=10, title_fontsize=11)
+                            loc='upper right', bbox_to_anchor=(1.0, 1.0), 
+                            fontsize=10, title_fontsize=11)
     ax.add_artist(first_legend)
     ax.legend(handles=opp_legend, title='Opponent', 
-             loc='lower right', fontsize=10, title_fontsize=11)
+             loc='upper right', bbox_to_anchor=(1.0, 0.65),
+             fontsize=10, title_fontsize=11)
     
     ax.grid(True, alpha=0.3)
     
