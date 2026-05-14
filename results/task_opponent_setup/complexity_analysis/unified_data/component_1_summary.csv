@@ -1,0 +1,6 @@
+,effective_dimensionality,effective_dimensionality,effective_dimensionality,embedding_specialization,embedding_specialization,weight_l2_norm,weight_l2_norm,social_ratio,social_ratio,payoff_variance,coordination_bonus
+,mean,std,count,mean,std,mean,std,mean,std,mean,mean
+train_game,,,,,,,,,,,
+hawk-dove,2.8,0.6164,5,0.2254,0.0036,33.8421,0.7082,0.6691,0.0008,1.25,-1.0
+prisoners-dilemma,2.04,0.4336,5,0.2338,0.0061,33.9595,0.5111,0.6691,0.0007,3.6875,-2.0
+stag-hunt,2.52,0.5762,5,0.2269,0.0053,33.4616,0.6406,0.6691,0.0007,2.1875,1.0

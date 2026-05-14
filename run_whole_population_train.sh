@@ -9,19 +9,19 @@
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=3-00:00:00
 #SBATCH --job-name=wp_train
-#SBATCH --array=0-14
+#SBATCH --array=0-59
 
 # ============================================================================
 # WHOLE POPULATION TRAINING PHASE
 # ============================================================================
-# 15 tasks: 3 games × 5 seeds
+# 60 tasks: 3 games × 20 seeds
 # Each task trains one vanilla RL agent against full opponent spectrum [0.0-1.0]
 # and saves checkpoint for testing phase
 #
 # Task ID mapping:
-#   0-4:   Prisoner's Dilemma (seeds 0-4)
-#   5-9:   Hawk-Dove (seeds 0-4)
-#   10-14: Stag Hunt (seeds 0-4)
+#   0-19:  Prisoner's Dilemma (seeds 0-19)
+#   20-39: Hawk-Dove (seeds 0-19)
+#   40-59: Stag Hunt (seeds 0-19)
 # ============================================================================
 
 module purge
@@ -35,7 +35,7 @@ mkdir -p slurm_logs
 mkdir -p experiments
 
 # Nested array calculation for seeds
-NUM_SEEDS=5
+NUM_SEEDS=20
 SEED_BASE=42
 SEED_GAP=10
 

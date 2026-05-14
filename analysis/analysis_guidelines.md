@@ -258,3 +258,316 @@ Results/
 - **Metric 4:** How agents decide (internal representations)
 
 This provides mechanistic insight into whether observed behaviors result from social reasoning or task-only optimization (Nash equilibrium).
+
+---
+
+### Reciprocity-Representation Coupling Analysis (Metric 5)
+
+**Research Question:** How do task complexity, opponent complexity, learned representations, and behavioral reciprocity relate to each other?
+
+**Core Hypotheses:**
+1. **Task Complexity → Representation Complexity**: More complex games (e.g., Stag-Hunt coordination) require richer internal representations
+2. **Opponent Complexity → Social Learning**: Adaptive opponents require reciprocity mechanisms, reflected in social embedding usage
+3. **Representation-Behavior Coupling**: Similar behaviors can emerge from different representations (many-to-one mapping)
+4. **Generalization from Coupling**: Agents with similar representation structure show similar generalization patterns
+
+#### 5.1 Complexity Metrics
+
+**Task Complexity Metrics:**
+- `nash_equilibrium_count`: Number of pure strategy Nash equilibria (1=simple, >1=complex)
+- `payoff_variance`: Variance in payoff matrix values (coordination games have higher variance)
+- `social_dilemma_strength`: T - R for PD-like games, or max(T,R) - min(S,P) generalized
+- `coordination_bonus`: R - max(S, T) for coordination games (negative for PD, positive for SH)
+- `risk_dominance`: Measure of risk in coordination: (R-S) vs (T-P)
+
+Game-specific values:
+- **Prisoner's Dilemma**: Simple (1 NE), strong dilemma, no coordination
+- **Hawk-Dove**: Medium complexity (1 NE in mixed strategies), anti-coordination
+- **Stag-Hunt**: Complex (2 NE), weak dilemma, strong coordination bonus
+
+**Opponent Complexity Metrics:**
+- `stationarity`: 1.0 for probabilistic opponents (fixed strategy)
+- `predictability`: 1 - entropy of opponent action distribution
+  - High for extreme opponents (0.1, 0.9): predictable
+  - Low for moderate opponents (0.5): unpredictable
+- `adaptation_requirement`: How much agent must adapt behavior across rounds
+  - Computed as variance in optimal response over opponent history
+- `cooperation_rate`: Mean opponent cooperation (0.1 → 0.9, 0.9 → 0.1)
+
+Opponent-specific values:
+- **0.1 (Very Cooperative)**: High predictability, high cooperation
+- **0.5 (Neutral)**: Low predictability, medium cooperation
+- **0.9 (Very Defective)**: High predictability, low cooperation
+
+**Behavioral Complexity Metrics:**
+- `reciprocity_strength`: P(coop|opp_coop_t-1) - P(coop|opp_defect_t-1) ∈ [-1, 1]
+  - Positive: reciprocal (tit-for-tat like)
+  - Near zero: non-reciprocal (stationary strategy)
+  - Negative: anti-reciprocal (contrarian)
+- `policy_entropy`: H(π) = -Σ π(a) log π(a), measures strategy randomness
+- `behavioral_variability`: Standard deviation of cooperation rate across games
+- `temporal_consistency`: Autocorrelation in action sequences (0=random, 1=deterministic)
+- `conditional_strategy_complexity`: Number of distinct P(coop|context) patterns
+
+**Representational Complexity Metrics:**
+- `social_ratio`: soc_total / (env_total + soc_total) from embedding weights
+- `weight_l2_norm`: Total magnitude of all network weights
+- `effective_dimensionality`: Intrinsic dimensionality of hidden state manifold
+  - Computed via PCA: number of components explaining 95% variance
+- `activation_sparsity`: Fraction of near-zero activations (L1/L2 ratio)
+- `representational_similarity`: CKA score comparing representations across conditions
+- `embedding_specialization`: Variance in weight magnitudes across embedding pathways
+  - High: some embeddings strongly used, others ignored
+  - Low: all embeddings used roughly equally
+
+#### 5.2 Analysis Components
+
+**Component 1: Task Complexity → Representation Structure**
+
+*Hypothesis*: Complex games (SH) require higher-dimensional representations than simple games (PD)
+
+Metrics:
+- Effective dimensionality by training game
+- Embedding specialization by training game
+- Weight L2 norm by training game
+
+Visualizations:
+- Bar chart: effective_dim vs training_game (3 bars: PD, HD, SH)
+- Heatmap: embedding_pathway_magnitude × training_game (6 pathways × 3 games)
+- Scatter: payoff_variance (x) vs effective_dim (y), color by game
+
+Expected Pattern:
+- PD: Low dimensionality (simple dominant strategy), high specialization (ignore social)
+- HD: Medium dimensionality (mixed strategy), medium specialization
+- SH: High dimensionality (coordination), low specialization (all inputs relevant)
+
+**Component 2: Opponent Complexity → Social Learning**
+
+*Hypothesis*: Extreme opponents (predictable) require less social learning than moderate opponents (unpredictable)
+
+Metrics:
+- Social ratio by opponent defection probability
+- Reciprocity strength by opponent defection probability
+- Social embedding ablation importance by opponent
+
+Visualizations:
+- Line plot: opponent_defect_prob (x) vs social_ratio (y), separate line per game
+- Line plot: opponent_defect_prob (x) vs reciprocity_strength (y), separate line per game
+- Heatmap: training_condition × social_embedding_importance (15 conditions × 4 social embeddings)
+
+Expected Pattern:
+- Extreme opponents (0.1, 0.9): Low social ratio (predictable → no need to track)
+- Moderate opponents (0.5): High social ratio (unpredictable → must track history)
+- Reciprocity strength follows inverted-U: highest for moderate opponents
+
+**Component 3: Representation-Behavior Coupling**
+
+*Hypothesis*: Similar behaviors can emerge from different representations (degeneracy)
+
+Analysis:
+1. Cluster agents by behavior: (mean_coop, reciprocity_strength)
+2. For each behavioral cluster, measure representation diversity:
+   - Within-cluster weight distance (should be high if degenerate)
+   - Between-cluster weight distance (for comparison)
+3. Test: within_cluster_distance / between_cluster_distance
+   - Ratio > 0.5: High degeneracy (same behavior, different representations)
+   - Ratio < 0.3: Low degeneracy (same behavior, same representation)
+
+Metrics:
+- Behavioral clusters via K-means (k=5) on (mean_coop, reciprocity_strength)
+- Weight-space distance: L2 norm of flattened parameter vectors
+- Representational similarity: CKA on hidden state activations
+
+Visualizations:
+- Scatter: mean_coop (x) vs reciprocity_strength (y), color=cluster_id, marker=game
+- Box plot: weight_distance, grouped by (within_cluster vs between_cluster)
+- Heatmap: CKA similarity matrix (75×75 for task-opponent, 15×15 for task)
+
+Expected Pattern:
+- High within-cluster diversity for defector cluster (all achieve via different paths)
+- Lower within-cluster diversity for reciprocator cluster (similar mechanisms)
+
+**Component 4: Generalization from Representation Structure**
+
+*Hypothesis*: Agents with similar representation structure show similar generalization patterns
+
+Analysis:
+1. Compute representation similarity matrix (CKA on hidden states)
+2. Compute generalization similarity matrix (correlation of test performance vectors)
+3. Test correlation: representational_similarity ~ generalization_similarity
+
+Metrics:
+- Representation similarity: CKA(model_i, model_j) ∈ [0,1]
+- Generalization similarity: Pearson correlation of normalized test rewards
+  - Each model has 14-dim vector (task-opponent) or 15-dim (task setup)
+- Mantel test: correlation between similarity matrices
+
+Visualizations:
+- Scatter: representation_similarity (x) vs generalization_similarity (y)
+  - Each point = model pair (i,j)
+  - Color by: same_training_game (yes/no)
+- Joint heatmap: Upper triangle = CKA, lower triangle = generalization correlation
+- Regression plot with confidence bands
+
+Expected Pattern:
+- Positive correlation: similar representations → similar generalization
+- Stronger correlation within same game (shared task structure)
+- Weaker correlation across games (different task demands)
+
+**Component 5: Integrated Complexity Analysis**
+
+*Hypothesis*: Complexity metrics form a coherent structure predicting agent behavior
+
+Analysis:
+1. Compute all 4 complexity domains for each agent:
+   - Task: nash_equilibria, payoff_variance, coordination_bonus
+   - Opponent: predictability, cooperation_rate
+   - Behavior: reciprocity_strength, policy_entropy
+   - Representation: social_ratio, effective_dim, weight_l2_norm
+2. Correlation analysis across domains
+3. Dimensionality reduction (PCA) to find latent complexity factors
+4. Regression: behavior ~ task_complexity + opponent_complexity + representation_complexity
+
+Visualizations:
+- Correlation matrix heatmap (all complexity metrics)
+- PCA biplot: PC1 vs PC2, color=training_game, marker=opponent
+- Feature importance: regression coefficients for predicting reciprocity_strength
+- Path diagram: task_complexity → representation_complexity → behavioral_complexity
+
+Expected Pattern:
+- Task complexity correlates with representation complexity (mediation)
+- Opponent complexity directly affects behavioral complexity
+- Representation complexity mediates task → behavior relationship
+
+#### 5.3 Implementation Plan
+
+**Script Structure:**
+```
+analysis/
+├── complexity_metrics.py              # Compute all 4 complexity domains
+├── reciprocity_representation_coupling.py  # Main analysis script
+└── run_complexity_analysis.py         # Entry point for both setups
+```
+
+**Key Functions:**
+
+```python
+# complexity_metrics.py
+def compute_task_complexity(game_name: str, payoff_matrix: np.ndarray) -> Dict[str, float]
+def compute_opponent_complexity(opponent_defect_prob: float, action_history: np.ndarray) -> Dict[str, float]
+def compute_behavioral_complexity(test_data: pd.DataFrame) -> Dict[str, float]
+def compute_representational_complexity(model: GameLSTM, test_states: torch.Tensor) -> Dict[str, float]
+
+# reciprocity_representation_coupling.py
+def analyze_task_representation_link(complexity_df: pd.DataFrame) -> Tuple[pd.DataFrame, plt.Figure]
+def analyze_opponent_social_learning_link(complexity_df: pd.DataFrame) -> Tuple[pd.DataFrame, plt.Figure]
+def analyze_representation_behavior_coupling(complexity_df: pd.DataFrame, models: Dict) -> Tuple[pd.DataFrame, plt.Figure]
+def analyze_generalization_from_representation(complexity_df: pd.DataFrame, test_df: pd.DataFrame) -> Tuple[pd.DataFrame, plt.Figure]
+def integrated_complexity_analysis(complexity_df: pd.DataFrame) -> Tuple[pd.DataFrame, plt.Figure]
+```
+
+**Execution:**
+```bash
+# Task-opponent setup (75 models → 15 aggregated)
+python analysis/run_complexity_analysis.py --setup task-opponent
+
+# Task setup (15 models → 3 aggregated)
+python analysis/run_complexity_analysis.py --setup task
+
+# Both setups
+python analysis/run_complexity_analysis.py --setup all
+```
+
+#### 5.4 Output Structure
+
+```
+Results/
+├── task_opponent_setup/
+│   └── complexity_analysis/
+│       ├── unified_data/
+│       │   ├── complexity_metrics.csv
+│       │   ├── representation_behavior_coupling.csv
+│       │   ├── generalization_similarity.csv
+│       │   └── integrated_complexity.csv
+│       └── plots/
+│           ├── metric_5.1_task_representation_link.png
+│           ├── metric_5.2_opponent_social_learning.png
+│           ├── metric_5.3_representation_behavior_coupling.png
+│           ├── metric_5.4_generalization_similarity.png
+│           ├── metric_5.5_integrated_complexity.png
+│           └── complexity_correlation_matrix.png
+└── task_setup/
+    └── complexity_analysis/
+        └── [same structure]
+```
+
+#### 5.5 Statistical Tests
+
+**Hypothesis Tests:**
+1. Task complexity → Representation complexity:
+   - One-way ANOVA: effective_dim ~ training_game
+   - Post-hoc: Tukey HSD for pairwise comparisons
+
+2. Opponent complexity → Social learning:
+   - Spearman correlation: opponent_predictability ~ social_ratio
+   - Quadratic regression: reciprocity_strength ~ opponent_defect_prob + opponent_defect_prob²
+
+3. Representation-behavior coupling:
+   - Permutation test: within_cluster_diversity vs between_cluster_diversity
+   - Effect size: Cohen's d
+
+4. Generalization from representation:
+   - Mantel test: CKA_matrix ~ generalization_correlation_matrix
+   - Linear regression: generalization_similarity ~ representation_similarity
+
+5. Integrated complexity:
+   - Mediation analysis: task_complexity → representation_complexity → behavioral_complexity
+   - Structural equation modeling (SEM) if enough power
+
+**Correction for Multiple Comparisons:**
+- Bonferroni correction within each component (5 components)
+- Report both corrected and uncorrected p-values
+- Focus on effect sizes over p-values
+
+#### 5.6 Expected Findings
+
+**Task-Opponent Setup (15 conditions):**
+- PD agents: High weight norms, low social ratio, low reciprocity (Nash dominates)
+- SH agents: Lower weight norms, higher social ratio, moderate reciprocity (coordination requires tracking)
+- HD agents: Medium on all metrics (anti-coordination)
+- Extreme opponents: Lower social ratios regardless of game (predictable)
+- Moderate opponents: Higher social ratios, higher reciprocity (must adapt)
+
+**Task Setup (3 conditions):**
+- Lower social ratios overall (no specific opponent to track)
+- Higher representational dimensionality (must handle multiple opponent types)
+- More degenerate representation-behavior mapping (one representation for multiple behaviors)
+- Stronger generalization-representation coupling (general representations transfer better)
+
+**Cross-Setup Comparison:**
+- Task-opponent: Specialist representations (high social ratio for specific opponents)
+- Task: Generalist representations (lower social ratio, higher dimensionality)
+- Trade-off: specialization (task-opponent) vs generalization (task)
+
+#### 5.7 Integration with Existing Metrics
+
+**How Metric 5 Extends Previous Analyses:**
+
+- **Metrics 3.1-3.5 (Behavioral)**: Provided WHAT agents do
+- **Metric 4 (Embeddings)**: Provided HOW agents encode inputs
+- **Metric 5 (Coupling)**: Provides WHY certain representations emerge and HOW they relate to behavior
+
+**Cross-metric Insights:**
+- Metric 3.4 (KLD from optimal) + Metric 5.1 → Do complex representations lead to better optimality?
+- Metric 3.5 (Clustering) + Metric 5.3 → Are behavioral clusters homogeneous in representation?
+- Metric 4.3 (Ablation) + Metric 5.2 → Does ablation importance predict reciprocity strength?
+- Metric 3.6b (Cross-task ratio) + Metric 5.4 → Does representation similarity predict generalization?
+
+**Unified Framework:**
+```
+Task Complexity → Representation Structure → Behavioral Patterns → Generalization
+      ↑                    ↑                        ↑                    ↓
+Opponent Complexity → Social Learning → Reciprocity → Test Performance
+```
+
+This positions Metric 5 as the integrative analysis that connects all previous findings into a coherent mechanistic story.

@@ -9,19 +9,19 @@
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=0-02:00:00
 #SBATCH --job-name=wp_test
-#SBATCH --array=0-224
+#SBATCH --array=0-899
 
 # ============================================================================
 # WHOLE POPULATION TESTING PHASE
 # ============================================================================
-# 225 tasks: 15 trained models × 15 test conditions (3 games × 5 opponents)
+# 900 tasks: 60 trained models × 15 test conditions (3 games × 5 opponents)
 # Each task loads one trained model and tests on one game+opponent combination
 #
 # Test conditions per model:
 #   - 3 games (PD, HD, SH) × 5 opponents [0.1, 0.3, 0.5, 0.7, 0.9] = 15 tests
 #
 # Task ID mapping:
-#   MODEL_ID = TASK_ID / 15  (which trained model: 0-14)
+#   MODEL_ID = TASK_ID / 15  (which trained model: 0-59)
 #   TEST_ID  = TASK_ID % 15  (which test condition: 0-14)
 # ============================================================================
 
