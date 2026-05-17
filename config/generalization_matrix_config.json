@@ -42,10 +42,11 @@
   },
   
   "network_config": {
-    "hidden_size": 128,
-    "num_layers": 2,
-    "dropout": 0.1,
-    "input_size": 9
+    "hidden_size": 32,
+    "num_layers": 1,
+    "dropout": 0.05,
+    "input_size": 9,
+    "note": "Reduced architecture based on capacity analysis: 23x fewer parameters (80k->3.5k), still 10x above observed effective dimensionality (2-3 dims)"
   },
   
   "training_config": {
@@ -64,9 +65,21 @@
   },
   
   "slurm_config": {
-    "total_tasks": 15,
-    "task_id_range": "0-14",
-    "estimated_time_per_task": "2:00:00",
-    "memory_per_task": "8G"
+    "training": {
+      "total_tasks": 300,
+      "description": "15 conditions × 20 seeds",
+      "task_id_range": "0-299",
+      "estimated_time_per_task": "2:00:00",
+      "memory_per_task": "32G",
+      "note": "Reduced time estimate due to smaller network (23x fewer params)"
+    },
+    "testing": {
+      "total_tasks": 4500,
+      "description": "300 trained agents × 15 test conditions (full cross-game/cross-opponent matrix)",
+      "task_id_range": "0-4499",
+      "estimated_time_per_task": "0:20:00",
+      "memory_per_task": "16G",
+      "note": "Reduced time estimate due to smaller network"
+    }
   }
 }
