@@ -49,18 +49,21 @@ UNIFIED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Payoff matrices for normalized reward calculation
+# CORRECTED: Must match actual game implementations in src/cognitive_therapy_ai/games.py
 PAYOFF_MATRICES = {
     'prisoners-dilemma': {
         'R': 3, 'S': 0, 'T': 5, 'P': 1,
         'min': 0, 'max': 5
     },
     'hawk-dove': {
-        'R': 3, 'S': 1, 'T': 5, 'P': 0,
-        'min': 0, 'max': 5
+        # V=6, C=10 → R=V/2=3, S=0, T=V=6, P=(V-C)/2=-2
+        'R': 3, 'S': 0, 'T': 6, 'P': -2,
+        'min': -2, 'max': 6
     },
     'stag-hunt': {
-        'R': 5, 'S': 0, 'T': 3, 'P': 1,
-        'min': 0, 'max': 5
+        # stag_payoff=4, hare_payoff=2, stag_failure=0 → R=4, T=2, P=2, S=0
+        'R': 4, 'S': 0, 'T': 2, 'P': 2,
+        'min': 0, 'max': 4
     }
 }
 
@@ -511,24 +514,16 @@ def plot_normalized_reward_heatmap(test_df: pd.DataFrame):
                 continue
             
             # Create pivot table: train_opponent × test_opponent
+            # Use pre-computed normalized_reward from CSV (normalized by test game's payoff matrix)
             pivot = subset.pivot_table(
                 index='train_opponent',
                 columns='test_opponent',
-                values='mean_reward',  # Use raw rewards, not pre-normalized
+                values='normalized_reward',  # Use pre-normalized values
                 aggfunc='mean'
             )
             
             # Reindex to ensure all opponents present
-            pivot = pivot.reindex(index=opponents, columns=opponents)
-            
-            # Normalize within this subplot to [0, 1]
-            pivot_min = pivot.min().min()
-            pivot_max = pivot.max().max()
-            
-            if pivot_max > pivot_min:
-                pivot_normalized = (pivot - pivot_min) / (pivot_max - pivot_min)
-            else:
-                pivot_normalized = pivot * 0  # All zeros if no variation
+            pivot_normalized = pivot.reindex(index=opponents, columns=opponents)
             
             # Plot heatmap
             sns.heatmap(pivot_normalized, ax=ax, cmap='RdYlGn', center=0.5, 
