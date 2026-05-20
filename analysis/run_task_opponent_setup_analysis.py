@@ -34,13 +34,13 @@ warnings.filterwarnings('ignore')
 # Base directory (project root)
 BASE_DIR = Path(__file__).parent.parent
 
-# Experiment directories
-TRAIN_EXPERIMENT = BASE_DIR / "experiments" / "generalization_matrix_train_913243"
-TEST_EXPERIMENT_1 = BASE_DIR / "experiments" / "generalization_matrix_test_913244"
-TEST_EXPERIMENT_2 = BASE_DIR / "experiments" / "generalization_matrix_test_913245"
+# Experiment directories - NEW DATA with reduced network (32 hidden, 1 layer)
+TRAIN_EXPERIMENT = BASE_DIR / "experiments" / "generalization_matrix_train_916788"
+TEST_EXPERIMENT_1 = BASE_DIR / "experiments" / "generalization_matrix_test_916789"
+TEST_EXPERIMENT_2 = None  # Only one test experiment for new data
 
 # Output directory
-OUTPUT_DIR = BASE_DIR / "Results" / "task_opponent_setup"
+OUTPUT_DIR = BASE_DIR / "Results" / "task_opponent_setup_reduced_network"
 UNIFIED_DATA_DIR = OUTPUT_DIR / "unified_data"
 PLOTS_DIR = OUTPUT_DIR / "plots"
 
@@ -297,8 +297,8 @@ def extract_test_data() -> pd.DataFrame:
     
     all_test_data = []
     
-    # Process both test experiment directories
-    test_experiments = [TEST_EXPERIMENT_1, TEST_EXPERIMENT_2]
+    # Process test experiment directories (filter out None)
+    test_experiments = [exp for exp in [TEST_EXPERIMENT_1, TEST_EXPERIMENT_2] if exp is not None]
     
     for test_exp in test_experiments:
         testing_dir = test_exp / "testing"

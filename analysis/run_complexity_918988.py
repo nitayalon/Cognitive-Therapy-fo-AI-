@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 """
-Complexity Analysis Entry Point
-===============================
+Complexity Analysis - Experiment 918988/918989
+==============================================
 
-Runs reciprocity-representation coupling analysis for both setups:
+Runs reciprocity-representation coupling analysis for:
 - Task-opponent (generalization matrix): 75 models → 15 aggregated
-- Task (whole population): 15 models → 3 aggregated
+- Reduced network: 128 hidden units, 2 LSTM layers
 
 Usage:
-    python analysis/run_complexity_analysis.py --setup task-opponent
-    python analysis/run_complexity_analysis.py --setup task
-    python analysis/run_complexity_analysis.py --setup all
+    python analysis/run_complexity_918988.py
 
 Author: Research Team
-Date: May 12, 2026
+Date: January 18, 2025
 """
 
 import argparse
@@ -57,15 +55,15 @@ def load_checkpoint(checkpoint_path: Path, device: torch.device) -> GameLSTM:
     else:
         state_dict = checkpoint
     
-    # Infer architecture - REDUCED NETWORK (experiments 916788/916789)
+    # Infer architecture - EXPERIMENT 918988/918989
     input_size = 9
-    hidden_size = 32  # Reduced from 128
+    hidden_size = 128  # Larger network
     
     model = GameLSTM(
         input_size=input_size,
         hidden_size=hidden_size,
-        num_layers=1,  # Reduced from 2
-        dropout=0.05   # Reduced from 0.1
+        num_layers=2,  # 2 LSTM layers
+        dropout=0.1
     )
     
     model.load_state_dict(state_dict)
@@ -78,14 +76,14 @@ def analyze_task_opponent_setup(output_base: Path):
     Analyze task-opponent setup (15 aggregated conditions from 75 models).
     """
     print("\n" + "="*80)
-    print("TASK-OPPONENT SETUP: Complexity Analysis")
+    print("TASK-OPPONENT SETUP: Complexity Analysis - Experiment 918988/918989")
     print("="*80)
     
-    # Paths - REDUCED NETWORK DATA
-    train_dir = project_root / 'experiments' / 'generalization_matrix_train_916788' / 'training'
-    test_dir = project_root / 'experiments' / 'generalization_matrix_test_916789' / 'testing'
+    # Paths - EXPERIMENT 918988/918989
+    train_dir = project_root / 'experiments' / 'generalization_matrix_train_918988' / 'training'
+    test_dir = project_root / 'experiments' / 'generalization_matrix_test_918989' / 'testing'
     
-    output_dir = output_base / 'task_opponent_setup_reduced_network' / 'complexity_analysis'
+    output_dir = output_base / 'task_opponent_918988_analysis' / 'complexity_analysis'
     output_dir.mkdir(parents=True, exist_ok=True)
     plots_dir = output_dir / 'plots'
     plots_dir.mkdir(exist_ok=True)
@@ -95,9 +93,9 @@ def analyze_task_opponent_setup(output_base: Path):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Load existing analysis data - REDUCED NETWORK
-    training_coop_csv = output_base / 'task_opponent_setup_reduced_network' / 'unified_data' / 'task_opponent_training_cooperation.csv'
-    test_results_csv = output_base / 'task_opponent_setup_reduced_network' / 'unified_data' / 'task_opponent_test_results.csv'
+    # Load existing analysis data - EXPERIMENT 918988/918989
+    training_coop_csv = output_base / 'task_opponent_918988_analysis' / 'unified_data' / 'task_opponent_training_cooperation.csv'
+    test_results_csv = output_base / 'task_opponent_918988_analysis' / 'unified_data' / 'task_opponent_test_results.csv'
     
     if not training_coop_csv.exists() or not test_results_csv.exists():
         print("Error: Required CSV files not found. Run run_task_opponent_setup_analysis.py first.")
@@ -562,21 +560,11 @@ def analyze_task_setup(output_base: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Run complexity analysis')
-    parser.add_argument('--setup', type=str, choices=['task-opponent', 'task', 'all'],
-                       default='all', help='Which setup to analyze')
-    args = parser.parse_args()
-    
     output_base = project_root / 'Results'
-    
-    if args.setup in ['task-opponent', 'all']:
-        analyze_task_opponent_setup(output_base)
-    
-    if args.setup in ['task', 'all']:
-        analyze_task_setup(output_base)
+    analyze_task_opponent_setup(output_base)
     
     print("\n" + "="*80)
-    print("ALL ANALYSES COMPLETE")
+    print("ANALYSIS COMPLETE")
     print("="*80)
 
 
