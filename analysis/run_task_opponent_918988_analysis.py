@@ -519,6 +519,88 @@ def plot_cooperation_heatmap(test_df: pd.DataFrame):
     plt.close()
 
 # ============================================================================
+# VISUALIZATION: NORMALIZED REWARD SUMMARY (3-PANEL)
+# ============================================================================
+
+def plot_normalized_reward_summary(test_df: pd.DataFrame):
+    """Plot normalized reward as 3-panel line plot (like KLD format)."""
+    print("\n" + "=" * 80)
+    print("GENERATING PLOT: Normalized Reward Summary (3-Panel)")
+    print("=" * 80)
+    
+    games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
+    opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
+    
+    opp_colors = {0.1: '#2E86AB', 0.3: '#54A8C7', 0.5: '#9E9E9E', 0.7: '#E07A5F', 0.9: '#C1121F'}
+    game_names = {g: GAME_DISPLAY_NAMES[g] for g in games}
+    sorted_games = sorted(games)
+    
+    # Create x-axis positions
+    x_positions = {}
+    x_labels = []
+    x_ticks = []
+    pos = 0
+    
+    for test_game in sorted_games:
+        for test_opp in opponents:
+            x_positions[(test_game, test_opp)] = pos
+            x_labels.append(f'{game_names[test_game]}\n{test_opp:.1f}')
+            x_ticks.append(pos)
+            pos += 1
+    
+    # Plot: 3 rows (one per training game)
+    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    
+    for i, train_game in enumerate(sorted_games):
+        ax = axes[i]
+        train_data = test_df[test_df['train_game'] == train_game]
+        
+        if len(train_data) == 0:
+            ax.text(0.5, 0.5, 'No Data', ha='center', va='center')
+            continue
+        
+        for train_opp in opponents:
+            opp_data = train_data[train_data['train_opponent'] == train_opp]
+            
+            if len(opp_data) == 0:
+                continue
+            
+            # Aggregate across test conditions
+            agg_data = opp_data.groupby(['test_game', 'test_opponent'])['normalized_reward'].mean().reset_index()
+            agg_data = agg_data.sort_values(['test_game', 'test_opponent'])
+            
+            x_vals = [x_positions[(row['test_game'], row['test_opponent'])] 
+                     for _, row in agg_data.iterrows()]
+            y_vals = agg_data['normalized_reward'].values
+            
+            ax.plot(x_vals, y_vals, marker='o', linewidth=2, markersize=6,
+                   label=f'Train opp={train_opp:.1f}', color=opp_colors[train_opp])
+        
+        ax.set_title(f'Training Game: {game_names[train_game]}', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Normalized Reward', fontsize=11)
+        ax.set_xticks(x_ticks)
+        ax.set_xticklabels(x_labels if i == 2 else [''] * len(x_labels), fontsize=8)
+        ax.legend(fontsize=9, loc='best', ncol=5)
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim(-0.05, 1.05)
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        ax.axhline(y=1, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        
+        # Add vertical separators between games
+        for sep_pos in [4.5, 9.5]:
+            ax.axvline(x=sep_pos, color='gray', linestyle='--', alpha=0.5)
+    
+    axes[2].set_xlabel('Test Game and Opponent', fontsize=11)
+    plt.suptitle('Task-Opponent Setup: Normalized Reward by Train/Test Condition', 
+                 fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    
+    output_file = PLOTS_DIR / 'normalized_reward_summary_3panel.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"  Saved: {output_file}")
+    plt.close()
+
+# ============================================================================
 # METRIC 3.4: KLD FROM OPTIMAL POLICY
 # ============================================================================
 
@@ -902,6 +984,7 @@ def main():
     if len(test_df) > 0:
         plot_normalized_reward_heatmap(test_df)
         plot_cooperation_heatmap(test_df)
+        plot_normalized_reward_summary(test_df)  # 3-panel summary plot
         
         # Additional metrics
         if len(training_df) > 0:
