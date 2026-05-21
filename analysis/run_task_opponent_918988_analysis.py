@@ -949,6 +949,204 @@ def metric_3_6a_cross_generalization_analysis(df_test):
     plt.close()
 
 # ============================================================================
+# METRIC 3.6B: CROSS-TASK GENERALIZATION RATIO
+# ============================================================================
+
+def metric_3_6b_training_relative_performance(df_test, df_training):
+    """
+    Metric 3.6b: Cross-task generalization ratio (AGGREGATED ACROSS SEEDS).
+    
+    X-axis: Final training cooperation rate (last epoch)
+    Y-axis: Cross-task ratio = mean(other_tasks_reward) / mean(same_task_reward)
+    
+    Where:
+    - same_task_reward: Test performance on same game as training (different opponents)
+    - other_tasks_reward: Test performance on different games (all opponents)
+    
+    Shows how well agents generalize across tasks vs. within the same task.
+    """
+    print("\n" + "=" * 80)
+    print("GENERATING PLOT: Metric 3.6b - Cross-Task Generalization Ratio")
+    print("=" * 80)
+    
+    # Extract final training cooperation rate per agent
+    final_training = df_training.groupby('task_id').agg({
+        'cooperation_rate': 'last'
+    }).reset_index()
+    final_training.columns = ['model_id', 'final_training_coop']
+    
+    # Compute metrics per agent
+    agent_metrics = []
+    
+    for model_id in df_test['model_id'].unique():
+        agent_data = df_test[df_test['model_id'] == model_id]
+        
+        train_game = agent_data['train_game'].iloc[0]
+        train_opponent = agent_data['train_opponent'].iloc[0]
+        seed = agent_data['seed'].iloc[0]
+        
+        # Get final training cooperation rate
+        training_row = final_training[final_training['model_id'] == model_id]
+        if len(training_row) > 0:
+            final_train_coop = training_row['final_training_coop'].iloc[0]
+        else:
+            final_train_coop = np.nan
+        
+        # Split test data into same task and other tasks
+        same_task_data = agent_data[agent_data['test_game'] == train_game]
+        other_tasks_data = agent_data[agent_data['test_game'] != train_game]
+        
+        # Calculate mean normalized rewards
+        mean_same_task_reward = same_task_data['normalized_reward'].mean()
+        mean_other_tasks_reward = other_tasks_data['normalized_reward'].mean()
+        
+        # Calculate ratio (other tasks / same task)
+        if mean_same_task_reward > 0 and not np.isnan(mean_same_task_reward):
+            cross_task_ratio = mean_other_tasks_reward / mean_same_task_reward
+        else:
+            cross_task_ratio = np.nan
+        
+        agent_metrics.append({
+            'model_id': model_id,
+            'train_game': train_game,
+            'train_opponent': train_opponent,
+            'seed': seed,
+            'final_training_coop': final_train_coop,
+            'mean_same_task_reward': mean_same_task_reward,
+            'mean_other_tasks_reward': mean_other_tasks_reward,
+            'cross_task_ratio': cross_task_ratio
+        })
+    
+    df_individual = pd.DataFrame(agent_metrics)
+    
+    # Aggregate across seeds for each (game, opponent) condition
+    df_agg = df_individual.groupby(['train_game', 'train_opponent']).agg({
+        'cross_task_ratio': ['mean', 'sem'],
+        'final_training_coop': ['mean', 'sem'],
+        'mean_same_task_reward': ['mean', 'sem'],
+        'mean_other_tasks_reward': ['mean', 'sem']
+    }).reset_index()
+    
+    # Flatten column names
+    df_agg.columns = ['train_game', 'train_opponent',
+                      'ratio_mean', 'ratio_sem',
+                      'train_coop_mean', 'train_coop_sem',
+                      'same_task_reward_mean', 'same_task_reward_sem',
+                      'other_tasks_reward_mean', 'other_tasks_reward_sem']
+    
+    print(f"  Aggregated {len(df_individual)} agents into {len(df_agg)} conditions")
+    
+    # Save data
+    individual_csv = UNIFIED_DATA_DIR / 'task_opponent_training_relative_performance_individual.csv'
+    df_individual.to_csv(individual_csv, index=False)
+    print(f"  Saved individual agent data: {individual_csv.name}")
+    
+    agg_csv = UNIFIED_DATA_DIR / 'task_opponent_training_relative_performance_aggregated.csv'
+    df_agg.to_csv(agg_csv, index=False)
+    print(f"  Saved aggregated data: {agg_csv.name}")
+    
+    # Plot scatter with error bars - X-axis is cooperation rate, Y-axis is performance ratio
+    fig, ax = plt.subplots(figsize=(12, 9))
+    sns.set_style("whitegrid")
+    
+    # Markers by game (task)
+    game_markers = {'prisoners-dilemma': 'o', 'hawk-dove': 's', 'stag-hunt': '^'}
+    
+    # Color by opponent
+    opp_colors = {0.1: '#2E86AB', 0.3: '#54A8C7', 0.5: '#9E9E9E', 0.7: '#E07A5F', 0.9: '#C1121F'}
+    
+    games = ['prisoners-dilemma', 'hawk-dove', 'stag-hunt']
+    opponents = [0.1, 0.3, 0.5, 0.7, 0.9]
+    
+    # Plot each condition
+    for game in games:
+        for opp in opponents:
+            game_opp_data = df_agg[
+                (df_agg['train_game'] == game) &
+                (df_agg['train_opponent'] == opp)
+            ]
+            
+            if len(game_opp_data) == 0:
+                continue
+            
+            game_abbrev = GAME_DISPLAY_NAMES[game]
+            
+            ax.errorbar(game_opp_data['train_coop_mean'], 
+                       game_opp_data['ratio_mean'],
+                       xerr=game_opp_data['train_coop_sem'],
+                       yerr=game_opp_data['ratio_sem'],
+                       fmt=game_markers[game], 
+                       color=opp_colors[opp],
+                       markersize=12, 
+                       alpha=0.7, 
+                       markeredgecolor='black', 
+                       markeredgewidth=1.5,
+                       capsize=4,
+                       capthick=1.5,
+                       elinewidth=1.5,
+                       label=f'{game_abbrev}, opp={opp:.1f}')
+    
+    ax.set_xlabel('Final Training Cooperation Rate (last epoch)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Cross-Task Generalization Ratio\n(Other Tasks Reward / Same Task Reward)', fontsize=12, fontweight='bold')
+    ax.set_title('Cross-Task Generalization Performance\n(n=5 seeds/condition)', 
+                 fontsize=14, fontweight='bold')
+    
+    # Create custom legend
+    from matplotlib.lines import Line2D
+    
+    # Game markers (shapes)
+    game_legend = [Line2D([0], [0], marker=game_markers[g], color='w', 
+                          markerfacecolor='gray', markersize=10, 
+                          label=GAME_DISPLAY_NAMES[g], markeredgecolor='black', markeredgewidth=1.5)
+                   for g in games]
+    
+    # Opponent colors
+    opp_legend = [Line2D([0], [0], marker='o', color='w', 
+                         markerfacecolor=opp_colors[o], markersize=10, label=f'opp={o:.1f}',
+                         markeredgecolor='black', markeredgewidth=1.5)
+                  for o in opponents]
+    
+    # Two legends - positioned in top right corner
+    first_legend = ax.legend(handles=game_legend, title='Game', 
+                            loc='upper right', bbox_to_anchor=(0.98, 0.98), 
+                            fontsize=10, title_fontsize=11)
+    ax.add_artist(first_legend)
+    ax.legend(handles=opp_legend, title='Opponent', 
+             loc='upper right', bbox_to_anchor=(0.98, 0.73),
+             fontsize=10, title_fontsize=11)
+    
+    ax.grid(True, alpha=0.3, which='both')
+    
+    # Set axis limits
+    ax.set_xlim(-0.05, 1.05)  # Cooperation rate is 0-1
+    
+    # Use linear scale with custom ticks starting from 0.5, spaced at 0.25
+    all_ratios = df_agg['ratio_mean'].values
+    valid_ratios = all_ratios[~np.isnan(all_ratios)]
+    
+    if len(valid_ratios) > 0:
+        y_max = np.max(valid_ratios) * 1.1
+        # Round up to nearest 0.25
+        y_max = np.ceil(y_max * 4) / 4
+    else:
+        y_max = 1.5
+    
+    # Set y-axis ticks at 0.25 intervals starting from 0.5
+    y_ticks = np.arange(0.5, y_max + 0.01, 0.25)
+    ax.set_yticks(y_ticks)
+    ax.set_ylim(0.5, y_max)
+    
+    # Add reference line at ratio = 1.0
+    ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2, label='ratio=1.0')
+    
+    plt.tight_layout()
+    
+    output_file = PLOTS_DIR / 'metric_3_6b_training_relative_performance.png'
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"  Saved: {output_file}")
+    plt.close()
+
+# ============================================================================
 # MAIN EXECUTION
 # ============================================================================
 
@@ -989,6 +1187,7 @@ def main():
         # Additional metrics
         if len(training_df) > 0:
             metric_3_4_kld_from_optimal(test_df, training_df)
+            metric_3_6b_training_relative_performance(test_df, training_df)
         
         metric_3_5_cluster_analysis(test_df)
         metric_3_6a_cross_generalization_analysis(test_df)
@@ -1005,13 +1204,17 @@ def main():
     print(f"    - task_opponent_kld_from_optimal.csv")
     print(f"    - task_opponent_cluster_analysis.csv")
     print(f"    - task_opponent_cross_generalization.csv")
+    print(f"    - task_opponent_training_relative_performance_individual.csv")
+    print(f"    - task_opponent_training_relative_performance_aggregated.csv")
     print(f"  Plots:")
     print(f"    - cooperation_vs_epoch_3x5.png")
     print(f"    - normalized_reward_heatmap_3x3.png")
     print(f"    - cooperation_heatmap_3x3.png")
+    print(f"    - normalized_reward_summary_3panel.png")
     print(f"    - metric_3_4_kld_from_optimal.png")
     print(f"    - metric_3_5_cluster_analysis.png")
     print(f"    - metric_3_6a_cross_generalization_analysis.png")
+    print(f"    - metric_3_6b_training_relative_performance.png")
     print("=" * 80)
 
 if __name__ == "__main__":
