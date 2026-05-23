@@ -2199,12 +2199,18 @@ def main():
     if args.experiment_mode == 'generalization-matrix':
         with open(args.matrix_config, 'r') as f:
             matrix_config_data = json.load(f)
-        network_config = NetworkConfig(**matrix_config_data['network_config'])
+        # Filter network config to only valid NetworkConfig fields
+        network_config_dict = {k: v for k, v in matrix_config_data['network_config'].items() 
+                               if k in ['hidden_size', 'num_layers', 'dropout', 'input_size']}
+        network_config = NetworkConfig(**network_config_dict)
         logger.info(f"Loaded network config from {args.matrix_config}: hidden={network_config.hidden_size}, layers={network_config.num_layers}")
     elif args.experiment_mode == 'whole-population':
         with open(args.wp_config, 'r') as f:
             wp_config_data = json.load(f)
-        network_config = NetworkConfig(**wp_config_data['network_config'])
+        # Filter network config to only valid NetworkConfig fields
+        network_config_dict = {k: v for k, v in wp_config_data['network_config'].items() 
+                               if k in ['hidden_size', 'num_layers', 'dropout', 'input_size']}
+        network_config = NetworkConfig(**network_config_dict)
         logger.info(f"Loaded network config from {args.wp_config}: hidden={network_config.hidden_size}, layers={network_config.num_layers}")
     else:
         network_config = NetworkConfig()
