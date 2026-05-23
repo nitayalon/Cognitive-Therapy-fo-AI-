@@ -66,20 +66,28 @@
   
   "slurm_config": {
     "training": {
-      "total_tasks": 300,
-      "description": "15 conditions × 20 seeds",
-      "task_id_range": "0-299",
+      "total_tasks": 150,
+      "description": "15 conditions × 10 seeds",
+      "task_id_range": "0-149",
       "estimated_time_per_task": "2:00:00",
       "memory_per_task": "32G",
       "note": "Reduced time estimate due to smaller network (23x fewer params)"
     },
     "testing": {
-      "total_tasks": 4500,
-      "description": "300 trained agents × 15 test conditions (full cross-game/cross-opponent matrix)",
-      "task_id_range": "0-4499",
+      "total_tasks": 2250,
+      "description": "150 trained agents × 15 test conditions (3 games × 5 opponent ranges)",
+      "task_id_range": "0-2249",
       "estimated_time_per_task": "0:20:00",
       "memory_per_task": "16G",
       "note": "Reduced time estimate due to smaller network"
+    },
+    "unified": {
+      "total_tasks": 2400,
+      "description": "150 training + 2250 testing (sequential)",
+      "task_id_range": "0-2399",
+      "training_range": "0-149",
+      "testing_range": "150-2399",
+      "note": "Unified script runs training first, then testing with dependencies"
     }
   }
 }

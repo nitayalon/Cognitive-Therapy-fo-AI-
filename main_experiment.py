@@ -2195,7 +2195,21 @@ def main():
         logger.info(f"Opponent defection probabilities: {opponent_probs}")
     
     # Create configurations
-    network_config = NetworkConfig()
+    # Load network config from JSON for generalization-matrix and whole-population modes
+    if args.experiment_mode == 'generalization-matrix':
+        with open(args.matrix_config, 'r') as f:
+            matrix_config_data = json.load(f)
+        network_config = NetworkConfig(**matrix_config_data['network_config'])
+        logger.info(f"Loaded network config from {args.matrix_config}: hidden={network_config.hidden_size}, layers={network_config.num_layers}")
+    elif args.experiment_mode == 'whole-population':
+        with open(args.wp_config, 'r') as f:
+            wp_config_data = json.load(f)
+        network_config = NetworkConfig(**wp_config_data['network_config'])
+        logger.info(f"Loaded network config from {args.wp_config}: hidden={network_config.hidden_size}, layers={network_config.num_layers}")
+    else:
+        network_config = NetworkConfig()
+        logger.info(f"Using default network config: hidden={network_config.hidden_size}, layers={network_config.num_layers}")
+    
     training_config = TrainingConfig(
         num_games_per_partner=args.num_games,
         max_epochs=args.max_epochs

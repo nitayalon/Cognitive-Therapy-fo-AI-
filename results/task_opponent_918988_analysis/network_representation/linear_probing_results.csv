@@ -1,3 +1,10 @@
-task,accuracy
-game_classification,1.0
-opponent_classification,1.0
+layer,task,accuracy
+Input Embedding,game,1.0
+Input Embedding,opponent,1.0
+Input Embedding,condition,1.0
+LSTM Hidden,game,1.0
+LSTM Hidden,opponent,1.0
+LSTM Hidden,condition,1.0
+Policy Output,game,0.4266666666666667
+Policy Output,opponent,0.19
+Policy Output,condition,0.6633333333333333

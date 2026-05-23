@@ -9,10 +9,10 @@
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=3-00:00:00
 #SBATCH --job-name=gen_matrix_train
-#SBATCH --array=0-74
+#SBATCH --array=0-149
 
 # TRAINING PHASE ONLY
-# 75 tasks: 15 conditions × 5 seeds
+# 150 tasks: 15 conditions × 10 seeds
 # Each task trains one model and saves checkpoint
 
 module purge
@@ -26,7 +26,7 @@ mkdir -p slurm_logs
 mkdir -p experiments
 
 # Nested array calculation
-NUM_SEEDS=5
+NUM_SEEDS=10
 SEED_BASE=6431
 SEED_GAP=10
 

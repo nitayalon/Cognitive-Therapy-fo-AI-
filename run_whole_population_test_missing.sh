@@ -9,7 +9,7 @@
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=0-02:00:00
 #SBATCH --job-name=wp_test_missing
-#SBATCH --array=0-224
+#SBATCH --array=0-899%100
 
 # ============================================================================
 # WHOLE POPULATION TESTING RERUN
@@ -23,7 +23,7 @@
 #   so the full 225-task test array must be rerun.
 #
 # Task mapping:
-#   MODEL_ID = TASK_ID / 15  (trained model: 0-14)
+#   MODEL_ID = TASK_ID / 15  (trained model: 0-59)
 #   TEST_ID  = TASK_ID % 15  (test condition: 0-14)
 # ============================================================================
 
