@@ -112,7 +112,7 @@ class SessionEnvironment:
         agent_action_enum = Action.COOPERATE if agent_action == 0 else Action.DEFECT
         
         # Opponent chooses action (memoryless)
-        opponent_action_enum = self.opponent.choose_action(game_history=[], round_number=0)
+        opponent_action_enum = self.opponent.play_action(game_history=[], round_number=0)
         
         # Get payoffs
         payoff_matrix = self.game.get_payoff_matrix()
@@ -438,7 +438,7 @@ class REINFORCETrainer:
             Fraction of actions matching BR (0.0 to 1.0)
         """
         payoff_matrix = env.game.get_payoff_matrix()
-        p_coop = 1.0 - env.opponent.defection_probability
+        p_coop = 1.0 - env.opponent.strategy.defection_probability
         
         br_action_enum = analytic_best_response(payoff_matrix, p_coop)
         br_action = 0 if br_action_enum == Action.COOPERATE else 1
