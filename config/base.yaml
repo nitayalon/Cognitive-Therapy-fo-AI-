@@ -1,0 +1,135 @@
+# === base.yaml — stable configuration across all runs ===
+# Single source of truth for payoff matrices and all hyperparameters
+
+games:
+  # Payoff matrix format: [[CC, CD], [DC, DD]] for the ROW player
+  # where C=Cooperate=0, D=Defect=1
+  # Rows: my action, Cols: opponent action
+  
+  PD:
+    name: "Prisoner's Dilemma"
+    payoff: [[3, 0], [5, 1]]  # [[R, S], [T, P]]
+    inequality: "T>R>P>S (T=5, R=3, P=1, S=0); D is dominant strategy"
+    # Inequality check: T(5) > R(3) > P(1) > S(0) ✓
+    # Additional: 2R(6) > T+S(5) ✓
+    
+  SH:
+    name: "Stag Hunt"
+    payoff: [[4, 0], [2, 2]]  # [[stag_payoff, stag_failure], [hare_payoff, hare_payoff]]
+    inequality: "R>T>=P>S (R=4, T=2, P=2, S=0); coordinate on C, payoff-dominant but risky"
+    # Inequality check: R(4) > T(2) >= P(2) > S(0) ✓
+    # Note: T=P represents the safe hare strategy
+    
+  HD:
+    name: "Hawk-Dove"
+    payoff: [[3, 0], [6, -2]]  # [[V/2, 0], [V, (V-C)/2]] with V=6, C=10
+    inequality: "T>R>S>P (T=6, R=3, S=0, P=-2); anti-coordination game"
+    # Inequality check: T(6) > R(3) > S(0) > P(-2) ✓
+
+opponents:
+  # Memoryless opponents: P(cooperate) = p_coop, independent of all history
+  # This is ESSENTIAL: opponent carries no state, so any state the agent maintains
+  # is the entire object of study, and best response is closed-form.
+  
+  bins: [0.1, 0.3, 0.5, 0.7, 0.9]  # LOCKED: 5 training/test bins (do not change)
+  
+  sanity:  # For tests only, not part of main grid
+    always_defect: 0.0
+    always_cooperate: 1.0
+
+encoding:
+  # Discrete, one-hot input encoding (makes exact FSM extraction possible)
+  
+  history_dim: 8  # one-hot: agent_last_action(2) + opp_last_action(2) + outcome(4)
+  
+  outcome_order: [CC, CD, DC, DD]  # Enumeration order for one-hot outcome encoding
+  
+  start_token: zeros  # all-zero vector at t=0 (no history yet)
+  
+  game_tag_dim: 3  # one-hot {PD, SH, HD}; used only when input_condition=game_tag
+  
+  # Ablation flags — OFF for all main results (enables exact FSM extraction)
+  include_timestep: false  # if true, adds timestep to input (breaks stationarity)
+  include_reward: false    # if true, adds rewards (breaks discrete alphabet)
+  
+  alphabet:
+    # Discrete alphabet enumeration for FSM extraction
+    history_symbols: [START, CC, CD, DC, DD]  # 5 symbols
+    # When input_condition=game_tag, full alphabet = history_symbols × games = 5 × 3 = 15
+
+agent:
+  # Small, extraction-friendly single-layer LSTM (NOT the deprecated large architecture)
+  type: lstm
+  num_layers: 1  # LOCKED: single-layer for FSM extraction
+  H_grid: [2, 4, 8, 16, 32]  # Hidden size swept in grid search
+  value_head: true  # For RL baseline (GAE)
+  
+  # DEPRECATED (do not implement now): Large architecture ablation
+  # - num_layers: 2, hidden_size: 128
+  # - 6 learned embedding pathways
+  # - 3 output heads (policy, opponent_policy, value)
+  # - 9D continuous input
+  # May be added later only to show small arch loses no behavioral performance
+
+train:
+  algorithm: reinforce_gae  # REINFORCE with value baseline / GAE
+  gamma: 0.99               # Discount factor
+  gae_lambda: 0.95          # GAE bias-variance tradeoff
+  
+  T: 100  # Rounds per session; hidden state persists within, resets between sessions
+  
+  lr: 0.001
+  optimizer: adam
+  batch_size: 32
+  max_epochs: 500
+  early_stop_patience: 50
+  convergence_tol: 1.0e-6
+  
+  n_seeds: 10  # Number of random seeds per condition
+  
+  bc_mode: false  # Supervised behavioral cloning vs analytic_best_response
+
+gridsearch:
+  # Grid search to justify network size (compression measurement)
+  knee_tolerance: 0.02  # Smallest H within this fraction of saturated performance
+  metric: best_response_accuracy  # Primary saturation metric
+
+extraction:
+  # FSM extraction from trained agents
+  rollout:
+    n_episodes: 500
+    epsilon_explore: 0.1      # Injected agent exploration for off-policy coverage
+    opponent_deviation: 0.1   # Injected opponent deviations
+    record_split: [on_policy, off_policy]  # Fidelity reported separately
+    
+  geometric:
+    k_grid: [1, 2, 3, 4, 5, 6, 8]  # Number of clusters to try
+    report_silhouette: true
+    
+  lstar:
+    enabled: true
+    equivalence_oracle: sampling  # Approximate equivalence checking
+    max_states: 32
+    
+  minimize: hopcroft  # DFA minimization algorithm
+  
+  fidelity_min_off_policy: 0.95  # Below this, FSM is NOT reportable (warn loudly)
+
+attribution:
+  # Dead-input / input-importance quantification
+  methods: [ablation, gradient]  # Both required; report agreement
+  channel_groups: [agent_last, opp_last, outcome, game_tag]
+
+analysis:
+  # Train × test matrices and automaton comparison
+  automaton_distance: behavioral_equivalence  # Over shared alphabet
+  
+  test_grid:  # LOCKED: every trained agent tested on all of these
+    games: [PD, SH, HD]
+    opponent_bins: [0.1, 0.3, 0.5, 0.7, 0.9]  # 3 × 5 = 15 test conditions
+
+reproducibility:
+  seed: 0  # Global seed; controls python/numpy/framework/GPU RNG
+  deterministic: true
+  log_git_commit: true
+  log_resolved_config: true

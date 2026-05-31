@@ -1,0 +1,21 @@
+# === Generalist (game-tag) experiment configuration ===
+# Input condition: game_tag
+# Input = 8D history + 3D one-hot game identifier = 11D total
+# One network trained across all three games
+# Tests multi-environment representation and its limits
+
+defaults: [base]
+
+experiment:
+  name: generalist_game_tag
+  input_condition: game_tag  # 8D history + 3D game one-hot = 11D
+  
+  # Single network trained on all three games (sampled per session)
+  train_games: [PD, SH, HD]
+  
+  train_opponent_bins: [0.1, 0.3, 0.5, 0.7, 0.9]  # All 5 bins
+  
+  # Expected result (to be empirically verified):
+  # - Can one representation span multiple environments?
+  # - Does game-tag input enable task-specific strategies?
+  # - How does extracted FSM structure differ from specialists?

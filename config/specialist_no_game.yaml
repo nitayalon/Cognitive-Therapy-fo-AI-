@@ -1,0 +1,20 @@
+# === Specialist (no-game) experiment configuration ===
+# Input condition: no_game
+# Input = 8D history only (no game identifier in input)
+# One separate network trained per game
+# This is the "compression" condition for the main result
+
+defaults: [base]
+
+experiment:
+  name: specialist_no_game
+  input_condition: no_game  # 8D discrete one-hot history only
+  
+  # Run once per game (PD, SH, HD) — typically via array job or sequential runs
+  train_games: [PD]  # Override this for SH, HD runs
+  
+  train_opponent_bins: [0.1, 0.3, 0.5, 0.7, 0.9]  # All 5 bins
+  
+  # Expected result (to be empirically verified):
+  # - PD specialist: compresses to 1-state "always defect" automaton
+  # - SH/HD specialists: retain multi-state opponent-tracking automata
