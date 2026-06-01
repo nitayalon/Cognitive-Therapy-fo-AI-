@@ -2,7 +2,7 @@
 #SBATCH -o ./slurm_logs/fsm_train_%x_%A_%a.out
 #SBATCH -e ./slurm_logs/fsm_train_%x_%A_%a.err
 #SBATCH -D ./
-#SBATCH --partition=standard
+#SBATCH --partition=highmem
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G
 #SBATCH --mail-type=END,FAIL
