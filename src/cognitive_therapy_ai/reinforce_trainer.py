@@ -23,7 +23,7 @@ Where:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, Union
 import numpy as np
 from dataclasses import dataclass
 
@@ -243,7 +243,7 @@ class REINFORCETrainer:
         env: SessionEnvironment,
         max_steps: int = 100,
         return_trajectory: bool = False
-    ) -> tuple[SessionStats, List[TrajectoryStep]] | SessionStats:
+    ) -> Union[Tuple[SessionStats, List[TrajectoryStep]], SessionStats]:
         """
         Train agent on one session using REINFORCE with GAE.
         
