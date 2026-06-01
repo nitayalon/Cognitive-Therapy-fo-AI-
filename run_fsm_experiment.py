@@ -200,19 +200,27 @@ def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
     
     print(f"    Fidelity: {fidelity_on:.3f}")
     
-    # FSM structure
+    # FSM structure (convert to JSON-serializable format)
+    transitions_serializable = {}
+    for state in minimized_fsm.states:
+        state_transitions = {}
+        for symbol in minimized_fsm.alphabet:
+            transition = minimized_fsm.transitions.get((state, symbol), None)
+            if transition is not None:
+                next_state, action = transition
+                # Convert Action enum to string
+                action_str = "COOPERATE" if action == Action.COOPERATE else "DEFECT"
+                state_transitions[symbol] = [next_state, action_str]
+            else:
+                state_transitions[symbol] = None
+        transitions_serializable[str(state)] = state_transitions
+    
     fsm_structure = {
         'states': list(minimized_fsm.states),
         'alphabet': list(minimized_fsm.alphabet),
-        'transitions': {
-            f"{state}": {
-                symbol: minimized_fsm.transitions.get((state, symbol), None)
-                for symbol in minimized_fsm.alphabet
-            }
-            for state in minimized_fsm.states
-        },
-        'start_state': minimized_fsm.start_state,
-        'accepting_states': list(minimized_fsm.accepting_states) if hasattr(minimized_fsm, 'accepting_states') else []
+        'transitions': transitions_serializable,
+        'initial_state': minimized_fsm.initial_state,
+        'n_states': minimized_fsm.n_states
     }
     
     return {
