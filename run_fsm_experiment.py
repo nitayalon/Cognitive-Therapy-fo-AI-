@@ -75,6 +75,68 @@ def obs_to_symbol(obs, encoder):
     return outcome_map[outcome_idx]
 
 
+def compute_fidelity_score(agent, fsm, env, encoder, n_episodes=50):
+    """
+    Compute fidelity: fraction of steps where FSM matches agent.
+    
+    Args:
+        agent: RepresentationAgent
+        fsm: Extracted FSM
+        env: SessionEnvironment
+        encoder: ObservationEncoder
+        n_episodes: Number of episodes to evaluate
+    
+    Returns:
+        float: Fidelity score (0 to 1)
+    """
+    total_steps = 0
+    matching_steps = 0
+    
+    for _ in range(n_episodes):
+        obs = env.reset()
+        hidden_state = agent.reset_hidden_state(batch_size=1)
+        fsm_state = fsm.initial_state
+        
+        for step in range(100):
+            # Get agent action
+            obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+            with torch.no_grad():
+                agent_action_int, _, hidden_state = agent.select_action(
+                    obs_tensor, hidden_state,
+                    deterministic=True,
+                    epsilon=0.0
+                )
+            # Handle both tensor and int returns
+            if isinstance(agent_action_int, torch.Tensor):
+                agent_action_int = agent_action_int.item()
+            
+            # Get FSM action (predict from current state and input symbol)
+            symbol = obs_to_symbol(obs, encoder)
+            if (fsm_state, symbol) in fsm.transitions:
+                next_fsm_state, fsm_action = fsm.transitions[(fsm_state, symbol)]
+                fsm_action_int = 0 if fsm_action == Action.COOPERATE else 1
+                
+                # Compare
+                if agent_action_int == fsm_action_int:
+                    matching_steps += 1
+                total_steps += 1
+                
+                fsm_state = next_fsm_state
+            else:
+                # FSM doesn't have this transition, skip comparison
+                pass
+            
+            # Step environment
+            obs, _, done, _, _, _ = env.step(agent_action_int)
+            
+            if done:
+                break
+    
+    if total_steps == 0:
+        return 0.0
+    return matching_steps / total_steps
+
+
 def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
     """
     Extract FSM from agent and return comprehensive data.
@@ -82,8 +144,7 @@ def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
     Returns:
         dict with keys:
             - fsm: Minimized FSM object
-            - fidelity_on_policy: float
-            - fidelity_off_policy: float
+            - fidelity: float
             - geometric_states: int
             - lstar_states: int
             - fsm_structure: dict (states, transitions, alphabet)
@@ -111,15 +172,16 @@ def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
     print("  Clustering hidden states...")
     n_clusters = min(agent.hidden_size, 20)
     clusterer = HiddenStateClusterer(n_clusters=n_clusters)
-    clusterer.fit(trajectories)
+    clusters = clusterer.fit(trajectories)
     
-    geometric_states = clusterer.n_clusters_
+    geometric_states = clusterer.n_clusters
     print(f"    Geometric clusters: {geometric_states}")
     
     # Extract FSM with L*
     print("  Running L* algorithm...")
-    lstar = LStarExtractor(agent, encoder, clusterer, obs_to_symbol)
-    fsm = lstar.learn_fsm(env)
+    alphabet = ["START", "CC", "CD", "DC", "DD"]
+    lstar = LStarExtractor(alphabet=alphabet)
+    fsm = lstar.extract_fsm(trajectories, clusters, clusterer, encoder)
     
     lstar_states = len(fsm.states)
     print(f"    L* states: {lstar_states}")
@@ -134,11 +196,9 @@ def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
     
     # Compute fidelity
     print("  Computing fidelity...")
-    fidelity_on = lstar.compute_fidelity(minimized_fsm, env, n_episodes=100, epsilon=0.0)
-    fidelity_off = lstar.compute_fidelity(minimized_fsm, env, n_episodes=100, epsilon=0.1)
+    fidelity_on = compute_fidelity_score(agent, minimized_fsm, env, encoder, n_episodes=100)
     
-    print(f"    On-policy fidelity: {fidelity_on:.3f}")
-    print(f"    Off-policy fidelity: {fidelity_off:.3f}")
+    print(f"    Fidelity: {fidelity_on:.3f}")
     
     # FSM structure
     fsm_structure = {
@@ -157,8 +217,7 @@ def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
     
     return {
         'fsm': minimized_fsm,
-        'fidelity_on_policy': float(fidelity_on),
-        'fidelity_off_policy': float(fidelity_off),
+        'fidelity': float(fidelity_on),
         'geometric_states': int(geometric_states),
         'lstar_states': int(lstar_states),
         'minimized_states': int(minimized_states),
@@ -302,8 +361,7 @@ def train_mode(args):
     
     # Save FSM data
     fidelity_data = {
-        'fidelity_on_policy': fsm_data['fidelity_on_policy'],
-        'fidelity_off_policy': fsm_data['fidelity_off_policy'],
+        'fidelity_train': fsm_data['fidelity'],
         'geometric_states': fsm_data['geometric_states'],
         'lstar_states': fsm_data['lstar_states'],
         'minimized_states': fsm_data['minimized_states'],
@@ -440,8 +498,7 @@ def test_mode(args):
                 'n_episodes': args.n_test_episodes,
                 'reward_mean': float(mean_reward),
                 'reward_std': float(std_reward),
-                'fidelity_on_policy': fsm_data['fidelity_on_policy'],
-                'fidelity_off_policy': fsm_data['fidelity_off_policy'],
+                'fidelity_test': fsm_data['fidelity'],
                 'geometric_states': fsm_data['geometric_states'],
                 'lstar_states': fsm_data['lstar_states'],
                 'minimized_states': fsm_data['minimized_states'],
@@ -486,7 +543,7 @@ def test_mode(args):
     print('-' * 70)
     for r in test_results:
         reward_str = f"{r['reward_mean']:.1f} ± {r['reward_std']:.1f}"
-        fidelity_str = f"{r['fidelity_on_policy']:.3f}"
+        fidelity_str = f"{r['fidelity_train']:.3f}"
         states_str = f"{r['minimized_states']}"
         print(f"{r['test_game']:<20} {r['test_opponent_coop']:<10} {reward_str:<15} {fidelity_str:<10} {states_str:<10}")
     
