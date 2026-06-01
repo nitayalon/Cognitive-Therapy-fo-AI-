@@ -200,8 +200,7 @@ def train_mode(args):
     
     # Create encoder
     encoder = ObservationEncoder(
-        input_condition=args.input_condition,
-        include_game_tag=(args.input_condition == 'game_tag')
+        input_condition=args.input_condition
     )
     
     # Create agent
@@ -365,8 +364,7 @@ def test_mode(args):
     
     # Create encoder (same as training)
     encoder = ObservationEncoder(
-        input_condition=config['input_condition'],
-        include_game_tag=(config['input_condition'] == 'game_tag')
+        input_condition=config['input_condition']
     )
     
     # Create agent and load weights
