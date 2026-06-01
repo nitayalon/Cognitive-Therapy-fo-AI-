@@ -1,0 +1,558 @@
+#!/usr/bin/env python3
+"""
+FSM Representation Experiment Runner
+
+Supports two modes:
+1. Training mode: Train agent, extract FSM, save checkpoint and trajectories
+2. Testing mode: Load checkpoint, test on unseen opponents/games, extract FSM, save trajectories
+
+Usage:
+  # Training
+  python run_fsm_experiment.py --mode train --game prisoners-dilemma --opponent 0.1 \
+      --hidden-size 4 --input-condition no_game --seed 42 --n-episodes 10000 \
+      --save-checkpoint --save-trajectories --output-dir experiments/train/condition_1
+
+  # Testing
+  python run_fsm_experiment.py --mode test --checkpoint-path path/to/checkpoint.pth \
+      --test-games prisoners-dilemma stag-hunt --test-opponents 0.3 0.5 0.9 \
+      --n-test-episodes 100 --save-trajectories --output-dir experiments/test/model_1
+"""
+
+import argparse
+import json
+import time
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+import numpy as np
+import torch
+import yaml
+
+from cognitive_therapy_ai.games import GameFactory, Action
+from cognitive_therapy_ai.opponent import OpponentFactory
+from cognitive_therapy_ai.encoding import ObservationEncoder
+from cognitive_therapy_ai.representation_agent import RepresentationAgent
+from cognitive_therapy_ai.reinforce_trainer import REINFORCETrainer, SessionEnvironment
+from cognitive_therapy_ai.fsm_extraction import (
+    RolloutCollector, HiddenStateClusterer, LStarExtractor, HopcroftMinimizer
+)
+from cognitive_therapy_ai.attribution import AttributionAnalyzer
+from cognitive_therapy_ai.trajectory_utils import save_episode_trajectories
+
+
+# Game name abbreviations
+GAME_ABBR = {
+    "prisoners-dilemma": "PD",
+    "stag-hunt": "SH",
+    "hawk-dove": "HD"
+}
+
+
+def print_section(title: str):
+    """Print a section header."""
+    print(f"\n{'='*70}")
+    print(f"  {title}")
+    print('='*70)
+
+
+def load_base_config():
+    """Load base configuration from config/base.yaml."""
+    config_path = Path("config/base.yaml")
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+
+def obs_to_symbol(obs, encoder):
+    """Convert observation to FSM symbol."""
+    history_dim = encoder.history_dim
+    if obs[:history_dim].sum() == 0:
+        return "START"
+    
+    # Extract outcome from one-hot
+    outcome_start = 4  # After agent(2) and opp(2)
+    outcome_bits = obs[outcome_start:outcome_start+4]
+    outcome_map = {0: "CC", 1: "CD", 2: "DC", 3: "DD"}
+    outcome_idx = np.argmax(outcome_bits)
+    return outcome_map[outcome_idx]
+
+
+def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
+    """
+    Extract FSM from agent and return comprehensive data.
+    
+    Returns:
+        dict with keys:
+            - fsm: Minimized FSM object
+            - fidelity_on_policy: float
+            - fidelity_off_policy: float
+            - geometric_states: int
+            - lstar_states: int
+            - fsm_structure: dict (states, transitions, alphabet)
+    """
+    opponent = OpponentFactory.create_probabilistic_opponent(
+        defection_probability=1.0 - opponent_coop
+    )
+    
+    env = SessionEnvironment(
+        game=game,
+        opponent=opponent,
+        encoder=encoder,
+        T=100,
+        game_name=game_abbr
+    )
+    
+    # Collect rollouts
+    print("  Collecting rollout trajectories...")
+    collector = RolloutCollector(agent, encoder)
+    trajectories = collector.collect_multiple_trajectories(
+        env, n_trajectories=100, max_steps=100, epsilon_explore=0.1
+    )
+    
+    # Cluster hidden states
+    print("  Clustering hidden states...")
+    n_clusters = min(agent.hidden_size, 20)
+    clusterer = HiddenStateClusterer(n_clusters=n_clusters)
+    clusterer.fit(trajectories)
+    
+    geometric_states = clusterer.n_clusters_
+    print(f"    Geometric clusters: {geometric_states}")
+    
+    # Extract FSM with L*
+    print("  Running L* algorithm...")
+    lstar = LStarExtractor(agent, encoder, clusterer, obs_to_symbol)
+    fsm = lstar.learn_fsm(env)
+    
+    lstar_states = len(fsm.states)
+    print(f"    L* states: {lstar_states}")
+    
+    # Minimize FSM
+    print("  Minimizing FSM...")
+    minimizer = HopcroftMinimizer()
+    minimized_fsm = minimizer.minimize(fsm)
+    
+    minimized_states = len(minimized_fsm.states)
+    print(f"    Minimized states: {minimized_states}")
+    
+    # Compute fidelity
+    print("  Computing fidelity...")
+    fidelity_on = lstar.compute_fidelity(minimized_fsm, env, n_episodes=100, epsilon=0.0)
+    fidelity_off = lstar.compute_fidelity(minimized_fsm, env, n_episodes=100, epsilon=0.1)
+    
+    print(f"    On-policy fidelity: {fidelity_on:.3f}")
+    print(f"    Off-policy fidelity: {fidelity_off:.3f}")
+    
+    # FSM structure
+    fsm_structure = {
+        'states': list(minimized_fsm.states),
+        'alphabet': list(minimized_fsm.alphabet),
+        'transitions': {
+            f"{state}": {
+                symbol: minimized_fsm.transitions.get((state, symbol), None)
+                for symbol in minimized_fsm.alphabet
+            }
+            for state in minimized_fsm.states
+        },
+        'start_state': minimized_fsm.start_state,
+        'accepting_states': list(minimized_fsm.accepting_states) if hasattr(minimized_fsm, 'accepting_states') else []
+    }
+    
+    return {
+        'fsm': minimized_fsm,
+        'fidelity_on_policy': float(fidelity_on),
+        'fidelity_off_policy': float(fidelity_off),
+        'geometric_states': int(geometric_states),
+        'lstar_states': int(lstar_states),
+        'minimized_states': int(minimized_states),
+        'fsm_structure': fsm_structure
+    }
+
+
+def train_mode(args):
+    """Run training mode."""
+    print_section("TRAINING MODE")
+    
+    # Set random seed
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    
+    # Load base config
+    base_config = load_base_config()
+    
+    # Create output directory
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Game setup
+    game_abbr = GAME_ABBR[args.game]
+    game = GameFactory.create_game(args.game)
+    opponent_coop = args.opponent
+    opponent = OpponentFactory.create_probabilistic_opponent(
+        defection_probability=1.0 - opponent_coop
+    )
+    
+    print(f"\nConfiguration:")
+    print(f"  Game: {args.game} ({game_abbr})")
+    print(f"  Opponent cooperation: {opponent_coop}")
+    print(f"  Hidden size: {args.hidden_size}")
+    print(f"  Input condition: {args.input_condition}")
+    print(f"  Training episodes: {args.n_episodes}")
+    print(f"  Random seed: {args.seed}")
+    print(f"  Output directory: {output_dir}")
+    
+    # Create encoder
+    encoder = ObservationEncoder(
+        input_condition=args.input_condition,
+        include_game_tag=(args.input_condition == 'game_tag')
+    )
+    
+    # Create agent
+    input_size = encoder.get_input_size()
+    agent = RepresentationAgent(
+        input_size=input_size,
+        hidden_size=args.hidden_size,
+        num_actions=2
+    )
+    
+    print(f"  Agent input size: {input_size}")
+    print(f"  Agent parameters: {sum(p.numel() for p in agent.parameters())}")
+    
+    # Create trainer
+    trainer = REINFORCETrainer(
+        agent=agent,
+        encoder=encoder,
+        learning_rate=base_config['train']['learning_rate'],
+        gamma=base_config['train']['gamma'],
+        gae_lambda=base_config['train']['gae_lambda']
+    )
+    
+    # Create environment
+    env = SessionEnvironment(
+        game=game,
+        opponent=opponent,
+        encoder=encoder,
+        T=100,
+        game_name=game_abbr
+    )
+    
+    # Training
+    print_section("TRAINING")
+    start_time = time.time()
+    
+    all_trajectories = []
+    episode_rewards = []
+    
+    for episode in range(args.n_episodes):
+        # Train with trajectory collection
+        stats, trajectories = trainer.train_session_rl(
+            env,
+            return_trajectory=True
+        )
+        
+        episode_rewards.append(stats.total_reward)
+        
+        # Collect trajectories if requested
+        if args.save_trajectories:
+            all_trajectories.extend(trajectories)
+        
+        # Progress reporting
+        if (episode + 1) % 1000 == 0:
+            recent_rewards = episode_rewards[-100:]
+            mean_reward = np.mean(recent_rewards)
+            std_reward = np.std(recent_rewards)
+            print(f"  Episode {episode+1}/{args.n_episodes}: "
+                  f"Reward = {mean_reward:.1f} ± {std_reward:.1f}")
+    
+    training_time = time.time() - start_time
+    
+    # Training metrics
+    train_metrics = {
+        'game': args.game,
+        'opponent_coop': opponent_coop,
+        'hidden_size': args.hidden_size,
+        'input_condition': args.input_condition,
+        'n_episodes': args.n_episodes,
+        'seed': args.seed,
+        'final_reward_mean': float(np.mean(episode_rewards[-100:])),
+        'final_reward_std': float(np.std(episode_rewards[-100:])),
+        'all_rewards': [float(r) for r in episode_rewards],
+        'training_time_sec': float(training_time)
+    }
+    
+    # Save training metrics
+    with open(output_dir / 'train_metrics.json', 'w') as f:
+        json.dump(train_metrics, f, indent=2)
+    
+    print(f"\n  Training completed in {training_time:.1f}s")
+    print(f"  Final reward: {train_metrics['final_reward_mean']:.1f} ± {train_metrics['final_reward_std']:.1f}")
+    
+    # Save trajectories
+    if args.save_trajectories:
+        print_section("SAVING TRAJECTORIES")
+        traj_path = output_dir / 'trajectories_train.jsonl.gz'
+        save_episode_trajectories(
+            all_trajectories,
+            traj_path,
+            subsample_every_nth=args.save_every_nth_episode
+        )
+        print(f"  Saved {len(all_trajectories)} trajectory steps to {traj_path}")
+        print(f"  Subsampling: every {args.save_every_nth_episode} episodes")
+    
+    # FSM extraction
+    print_section("FSM EXTRACTION (TRAINING DATA)")
+    fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr)
+    
+    # Save FSM data
+    fidelity_data = {
+        'fidelity_on_policy': fsm_data['fidelity_on_policy'],
+        'fidelity_off_policy': fsm_data['fidelity_off_policy'],
+        'geometric_states': fsm_data['geometric_states'],
+        'lstar_states': fsm_data['lstar_states'],
+        'minimized_states': fsm_data['minimized_states'],
+        'fsm_structure': fsm_data['fsm_structure']
+    }
+    
+    with open(output_dir / 'fidelity_train.json', 'w') as f:
+        json.dump(fidelity_data, f, indent=2)
+    
+    # Save checkpoint
+    if args.save_checkpoint:
+        print_section("SAVING CHECKPOINT")
+        checkpoint = {
+            'agent_state_dict': agent.state_dict(),
+            'config': {
+                'game': args.game,
+                'opponent_coop': opponent_coop,
+                'hidden_size': args.hidden_size,
+                'input_condition': args.input_condition,
+                'input_size': input_size,
+                'seed': args.seed
+            },
+            'train_metrics': train_metrics,
+            'fidelity': fidelity_data
+        }
+        
+        checkpoint_path = output_dir / 'checkpoint.pth'
+        torch.save(checkpoint, checkpoint_path)
+        print(f"  Saved checkpoint to {checkpoint_path}")
+    
+    print_section("TRAINING COMPLETE")
+    print(f"  Output directory: {output_dir}")
+    print(f"  Files saved:")
+    print(f"    - train_metrics.json")
+    print(f"    - fidelity_train.json")
+    if args.save_trajectories:
+        print(f"    - trajectories_train.jsonl.gz")
+    if args.save_checkpoint:
+        print(f"    - checkpoint.pth")
+
+
+def test_mode(args):
+    """Run testing mode."""
+    print_section("TESTING MODE")
+    
+    # Load checkpoint
+    print(f"\nLoading checkpoint from {args.checkpoint_path}")
+    checkpoint = torch.load(args.checkpoint_path, map_location='cpu', weights_only=False)
+    
+    config = checkpoint['config']
+    print(f"  Trained on: {config['game']}")
+    print(f"  Opponent cooperation: {config['opponent_coop']}")
+    print(f"  Hidden size: {config['hidden_size']}")
+    print(f"  Input condition: {config['input_condition']}")
+    
+    # Create output directory
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create encoder (same as training)
+    encoder = ObservationEncoder(
+        input_condition=config['input_condition'],
+        include_game_tag=(config['input_condition'] == 'game_tag')
+    )
+    
+    # Create agent and load weights
+    agent = RepresentationAgent(
+        input_size=config['input_size'],
+        hidden_size=config['hidden_size'],
+        num_actions=2
+    )
+    agent.load_state_dict(checkpoint['agent_state_dict'])
+    agent.eval()
+    
+    print(f"\nAgent loaded successfully")
+    
+    # Test on all combinations of games and opponents
+    test_results = []
+    all_trajectories = []
+    
+    for test_game in args.test_games:
+        game_abbr = GAME_ABBR[test_game]
+        game = GameFactory.create_game(test_game)
+        
+        for test_opponent_coop in args.test_opponents:
+            print_section(f"Testing: {test_game} vs {test_opponent_coop}")
+            
+            # Create opponent and environment
+            opponent = OpponentFactory.create_probabilistic_opponent(
+                defection_probability=1.0 - test_opponent_coop
+            )
+            
+            env = SessionEnvironment(
+                game=game,
+                opponent=opponent,
+                encoder=encoder,
+                T=100,
+                game_name=game_abbr
+            )
+            
+            # Create trainer for evaluation
+            trainer = REINFORCETrainer(
+                agent=agent,
+                encoder=encoder,
+                learning_rate=0.001  # Not used during evaluation
+            )
+            
+            # Run test episodes
+            episode_rewards = []
+            test_trajectories = []
+            
+            for episode in range(args.n_test_episodes):
+                stats, trajectories = trainer.train_session_rl(
+                    env,
+                    return_trajectory=True
+                )
+                episode_rewards.append(stats.total_reward)
+                
+                if args.save_trajectories:
+                    test_trajectories.extend(trajectories)
+            
+            # Compute statistics
+            mean_reward = np.mean(episode_rewards)
+            std_reward = np.std(episode_rewards)
+            
+            print(f"  Test reward: {mean_reward:.1f} ± {std_reward:.1f}")
+            
+            # Extract FSM on test data
+            print(f"  Extracting FSM...")
+            fsm_data = extract_fsm_with_data(agent, encoder, game, test_opponent_coop, game_abbr)
+            
+            # Store results
+            result = {
+                'test_game': test_game,
+                'test_opponent_coop': test_opponent_coop,
+                'n_episodes': args.n_test_episodes,
+                'reward_mean': float(mean_reward),
+                'reward_std': float(std_reward),
+                'fidelity_on_policy': fsm_data['fidelity_on_policy'],
+                'fidelity_off_policy': fsm_data['fidelity_off_policy'],
+                'geometric_states': fsm_data['geometric_states'],
+                'lstar_states': fsm_data['lstar_states'],
+                'minimized_states': fsm_data['minimized_states'],
+                'fsm_structure': fsm_data['fsm_structure']
+            }
+            test_results.append(result)
+            
+            if args.save_trajectories:
+                all_trajectories.extend(test_trajectories)
+    
+    # Save test results
+    print_section("SAVING TEST RESULTS")
+    
+    test_summary = {
+        'checkpoint_path': str(args.checkpoint_path),
+        'training_config': config,
+        'test_games': args.test_games,
+        'test_opponents': args.test_opponents,
+        'n_test_episodes': args.n_test_episodes,
+        'results': test_results
+    }
+    
+    with open(output_dir / 'test_results.json', 'w') as f:
+        json.dump(test_summary, f, indent=2)
+    
+    print(f"  Saved test results to {output_dir / 'test_results.json'}")
+    
+    # Save trajectories
+    if args.save_trajectories:
+        traj_path = output_dir / 'trajectories_test.jsonl.gz'
+        save_episode_trajectories(
+            all_trajectories,
+            traj_path,
+            subsample_every_nth=args.save_every_nth_episode
+        )
+        print(f"  Saved {len(all_trajectories)} trajectory steps to {traj_path}")
+        print(f"  Subsampling: every {args.save_every_nth_episode} episodes")
+    
+    # Print summary table
+    print_section("TEST SUMMARY")
+    print(f"\n{'Game':<20} {'Opponent':<10} {'Reward':<15} {'Fidelity':<10} {'States':<10}")
+    print('-' * 70)
+    for r in test_results:
+        reward_str = f"{r['reward_mean']:.1f} ± {r['reward_std']:.1f}"
+        fidelity_str = f"{r['fidelity_on_policy']:.3f}"
+        states_str = f"{r['minimized_states']}"
+        print(f"{r['test_game']:<20} {r['test_opponent_coop']:<10} {reward_str:<15} {fidelity_str:<10} {states_str:<10}")
+    
+    print(f"\n  Output directory: {output_dir}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="FSM Representation Experiment Runner")
+    parser.add_argument('--mode', type=str, required=True, choices=['train', 'test'],
+                        help='Experiment mode: train or test')
+    parser.add_argument('--output-dir', type=str, required=True,
+                        help='Output directory for results')
+    
+    # Training arguments
+    parser.add_argument('--game', type=str, 
+                        choices=['prisoners-dilemma', 'stag-hunt', 'hawk-dove'],
+                        help='Game to train on (required for train mode)')
+    parser.add_argument('--opponent', type=float,
+                        help='Opponent cooperation probability (required for train mode)')
+    parser.add_argument('--hidden-size', type=int, default=4,
+                        help='LSTM hidden size (default: 4)')
+    parser.add_argument('--input-condition', type=str, default='no_game',
+                        choices=['no_game', 'game_tag'],
+                        help='Input encoding condition (default: no_game)')
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Random seed (default: 42)')
+    parser.add_argument('--n-episodes', type=int, default=10000,
+                        help='Number of training episodes (default: 10000)')
+    parser.add_argument('--save-checkpoint', action='store_true',
+                        help='Save model checkpoint after training')
+    
+    # Testing arguments
+    parser.add_argument('--checkpoint-path', type=str,
+                        help='Path to checkpoint file (required for test mode)')
+    parser.add_argument('--test-games', type=str, nargs='+',
+                        choices=['prisoners-dilemma', 'stag-hunt', 'hawk-dove'],
+                        help='Games to test on (required for test mode)')
+    parser.add_argument('--test-opponents', type=float, nargs='+',
+                        help='Opponent cooperation probabilities for testing (required for test mode)')
+    parser.add_argument('--n-test-episodes', type=int, default=100,
+                        help='Number of test episodes per condition (default: 100)')
+    
+    # Trajectory saving arguments
+    parser.add_argument('--save-trajectories', action='store_true',
+                        help='Save behavioral trajectories')
+    parser.add_argument('--save-every-nth-episode', type=int, default=1,
+                        help='Subsample trajectories: save every Nth episode (default: 1 = all)')
+    
+    args = parser.parse_args()
+    
+    # Validate arguments
+    if args.mode == 'train':
+        if args.game is None or args.opponent is None:
+            parser.error("--game and --opponent are required for train mode")
+    elif args.mode == 'test':
+        if args.checkpoint_path is None or args.test_games is None or args.test_opponents is None:
+            parser.error("--checkpoint-path, --test-games, and --test-opponents are required for test mode")
+    
+    # Run appropriate mode
+    if args.mode == 'train':
+        train_mode(args)
+    else:
+        test_mode(args)
+
+
+if __name__ == '__main__':
+    main()

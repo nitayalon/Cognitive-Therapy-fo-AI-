@@ -70,11 +70,13 @@ class IntegratedGradients:
         self,
         agent: RepresentationAgent,
         encoder: ObservationEncoder,
-        device: torch.device = None
+        device: torch.device = None,
+        game_name: Optional[str] = None
     ):
         self.agent = agent
         self.encoder = encoder
         self.device = device or torch.device('cpu')
+        self.game_name = game_name
         self.agent.eval()
     
     def attribute(
@@ -100,7 +102,7 @@ class IntegratedGradients:
         """
         # Default baseline: START token (all zeros)
         if baseline is None:
-            baseline = self.encoder.encode_start_token()
+            baseline = self.encoder.encode_start_token(game_name=self.game_name)
         
         # Convert to tensors
         obs_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device)
@@ -269,13 +271,15 @@ class AttributionAnalyzer:
         self,
         agent: RepresentationAgent,
         encoder: ObservationEncoder,
-        device: torch.device = None
+        device: torch.device = None,
+        game_name: Optional[str] = None
     ):
         self.agent = agent
         self.encoder = encoder
         self.device = device or torch.device('cpu')
+        self.game_name = game_name
         
-        self.ig = IntegratedGradients(agent, encoder, device)
+        self.ig = IntegratedGradients(agent, encoder, device, game_name)
         self.saliency = SaliencyAnalyzer(agent, device)
     
     def analyze_trajectory(

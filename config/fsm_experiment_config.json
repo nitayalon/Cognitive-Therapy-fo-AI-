@@ -1,0 +1,195 @@
+{
+  "experiment_name": "fsm_representation",
+  "description": "FSM extraction experiment with train-test paradigm. Train on subset of opponents, test generalization to unseen opponents.",
+  
+  "research_question": "Does the training environment shape an agent's internal representation, which determines its behavioral policy?",
+  
+  "games": [
+    "prisoners-dilemma",
+    "stag-hunt",
+    "hawk-dove"
+  ],
+  
+  "input_conditions": [
+    "no_game",
+    "game_tag"
+  ],
+  
+  "opponent_bins": {
+    "train": [0.1, 0.7],
+    "test": [0.3, 0.5, 0.9],
+    "description": "Train on extreme cooperation rates (low=0.1, high=0.7), test on intermediate and very high (0.3, 0.5, 0.9)"
+  },
+  
+  "hidden_sizes": [2, 4, 8, 16, 32],
+  
+  "training_conditions_no_game": [
+    {"id": 0,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.1, "H": 2},
+    {"id": 1,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.1, "H": 4},
+    {"id": 2,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.1, "H": 8},
+    {"id": 3,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.1, "H": 16},
+    {"id": 4,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.1, "H": 32},
+    {"id": 5,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.7, "H": 2},
+    {"id": 6,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.7, "H": 4},
+    {"id": 7,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.7, "H": 8},
+    {"id": 8,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.7, "H": 16},
+    {"id": 9,  "input_condition": "no_game", "game": "prisoners-dilemma", "opponent": 0.7, "H": 32},
+    
+    {"id": 10, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.1, "H": 2},
+    {"id": 11, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.1, "H": 4},
+    {"id": 12, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.1, "H": 8},
+    {"id": 13, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.1, "H": 16},
+    {"id": 14, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.1, "H": 32},
+    {"id": 15, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.7, "H": 2},
+    {"id": 16, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.7, "H": 4},
+    {"id": 17, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.7, "H": 8},
+    {"id": 18, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.7, "H": 16},
+    {"id": 19, "input_condition": "no_game", "game": "stag-hunt", "opponent": 0.7, "H": 32},
+    
+    {"id": 20, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.1, "H": 2},
+    {"id": 21, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.1, "H": 4},
+    {"id": 22, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.1, "H": 8},
+    {"id": 23, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.1, "H": 16},
+    {"id": 24, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.1, "H": 32},
+    {"id": 25, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.7, "H": 2},
+    {"id": 26, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.7, "H": 4},
+    {"id": 27, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.7, "H": 8},
+    {"id": 28, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.7, "H": 16},
+    {"id": 29, "input_condition": "no_game", "game": "hawk-dove", "opponent": 0.7, "H": 32}
+  ],
+  
+  "training_conditions_game_tag": [
+    {"id": 30, "input_condition": "game_tag", "game": "prisoners-dilemma", "opponent": 0.1, "H": 4},
+    {"id": 31, "input_condition": "game_tag", "game": "prisoners-dilemma", "opponent": 0.1, "H": 8},
+    {"id": 32, "input_condition": "game_tag", "game": "prisoners-dilemma", "opponent": 0.7, "H": 4},
+    {"id": 33, "input_condition": "game_tag", "game": "prisoners-dilemma", "opponent": 0.7, "H": 8},
+    
+    {"id": 34, "input_condition": "game_tag", "game": "stag-hunt", "opponent": 0.1, "H": 4},
+    {"id": 35, "input_condition": "game_tag", "game": "stag-hunt", "opponent": 0.1, "H": 8},
+    {"id": 36, "input_condition": "game_tag", "game": "stag-hunt", "opponent": 0.7, "H": 4},
+    {"id": 37, "input_condition": "game_tag", "game": "stag-hunt", "opponent": 0.7, "H": 8},
+    
+    {"id": 38, "input_condition": "game_tag", "game": "hawk-dove", "opponent": 0.1, "H": 4},
+    {"id": 39, "input_condition": "game_tag", "game": "hawk-dove", "opponent": 0.1, "H": 8},
+    {"id": 40, "input_condition": "game_tag", "game": "hawk-dove", "opponent": 0.7, "H": 4},
+    {"id": 41, "input_condition": "game_tag", "game": "hawk-dove", "opponent": 0.7, "H": 8}
+  ],
+  
+  "total_training_conditions": 42,
+  
+  "network_config": {
+    "type": "lstm",
+    "num_layers": 1,
+    "dropout": 0.0,
+    "note": "Single-layer LSTM for FSM extraction. H swept in [2,4,8,16,32]"
+  },
+  
+  "training_config": {
+    "algorithm": "reinforce_gae",
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "T": 100,
+    "lr": 0.001,
+    "optimizer": "adam",
+    "batch_size": 32,
+    "n_episodes": 10000,
+    "convergence_window": 50,
+    "convergence_std_threshold": 0.5,
+    "note": "Increased from 1000 to 10000 episodes for stable convergence"
+  },
+  
+  "fsm_extraction_config": {
+    "n_rollout_episodes": 500,
+    "epsilon_explore": 0.1,
+    "n_clusters_options": "auto",
+    "validation_episodes": 100,
+    "fidelity_threshold": 0.95,
+    "note": "Extract FSM from trained agent using L* algorithm with geometric clustering"
+  },
+  
+  "attribution_config": {
+    "method": "integrated_gradients",
+    "n_steps": 50,
+    "note": "Identify which input features drive agent decisions"
+  },
+  
+  "test_config": {
+    "test_on_unseen_opponents": true,
+    "test_opponents": [0.3, 0.5, 0.9],
+    "test_same_game": true,
+    "test_cross_game": false,
+    "n_test_episodes": 100,
+    "extract_fsm_on_test": true,
+    "note": "Evaluate generalization: train on [0.1, 0.7], test on [0.3, 0.5, 0.9]"
+  },
+  
+  "seeds": {
+    "base_seed": 42,
+    "n_seeds": 10,
+    "seed_values": [42, 123, 456, 789, 1011, 1213, 1415, 1617, 1819, 2021],
+    "note": "10 seeds for statistical robustness"
+  },
+  
+  "slurm_config": {
+    "training": {
+      "total_tasks": 420,
+      "description": "42 conditions × 10 seeds",
+      "task_id_range": "0-419",
+      "estimated_time_per_task": "2:00:00",
+      "memory_per_task": "8G",
+      "cpus_per_task": 2,
+      "note": "Training includes FSM extraction, attribution, and in-distribution validation"
+    },
+    "testing": {
+      "total_tasks": 1260,
+      "description": "420 trained models × 3 unseen test opponents",
+      "task_id_range": "0-1259",
+      "estimated_time_per_task": "0:30:00",
+      "memory_per_task": "4G",
+      "cpus_per_task": 1,
+      "note": "Load checkpoint, test on unseen opponent, extract FSM, measure generalization"
+    }
+  },
+  
+  "output_structure": {
+    "training": "experiments/fsm_representation_train_{JOB_ID}/condition_{COND_ID}_seed_{SEED_ID}/",
+    "testing": "experiments/fsm_representation_test_{JOB_ID}/model_{MODEL_ID}_test_opp_{OPP}/",
+    "checkpoints": "{TRAIN_DIR}/checkpoints/final_checkpoint.pth",
+    "results": "{TRAIN_DIR}/results/",
+    "fsm": "{RESULTS_DIR}/fsm/",
+    "attribution": "{RESULTS_DIR}/attribution/",
+    "metrics": "{RESULTS_DIR}/train_metrics.json"
+  },
+  
+  "expected_outputs": {
+    "training_phase": [
+      "train_metrics.json (rewards, convergence stats)",
+      "fidelity.json (on-policy and off-policy FSM fidelity)",
+      "attribution_profile.json (feature importance)",
+      "fsm_vs_best_response.json (behavioral correctness)",
+      "final_checkpoint.pth (trained agent)"
+    ],
+    "testing_phase": [
+      "test_metrics.json (rewards on unseen opponent)",
+      "test_fidelity.json (FSM fidelity on test data)",
+      "generalization_report.json (comparison to training performance)"
+    ]
+  },
+  
+  "analysis_plan": {
+    "gates": [
+      "Gate 1: Training convergence (100% of cells)",
+      "Gate 2: FSM extraction success (≥80% fidelity)",
+      "Gate 3: Behavioral correctness (100% best-response agreement)",
+      "Gate 4: Test generalization (reward within 10% of training)",
+      "Gate 5: FSM fidelity transfer (test fidelity ≥ 0.8 × train fidelity)"
+    ],
+    "key_comparisons": [
+      "Specialist (no_game) vs Generalist (game_tag)",
+      "Train opponents (0.1, 0.7) vs Test opponents (0.3, 0.5, 0.9)",
+      "Low-coop (0.1) vs High-coop (0.7) vs Mid-coop (0.3, 0.5, 0.9)",
+      "FSM complexity (H=2 vs H=32)",
+      "Stochastic policies (SH opp=0.7) vs Deterministic (PD all)"
+    ]
+  }
+}

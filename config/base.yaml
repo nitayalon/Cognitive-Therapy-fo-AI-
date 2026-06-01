@@ -78,6 +78,8 @@ train:
   
   T: 100  # Rounds per session; hidden state persists within, resets between sessions
   
+  n_episodes: 10000  # Training episodes (increased from 1000 for stable convergence)
+  
   lr: 0.001
   optimizer: adam
   batch_size: 32
@@ -97,7 +99,7 @@ gridsearch:
 extraction:
   # FSM extraction from trained agents
   rollout:
-    n_episodes: 500
+    n_episodes: 500  # Rollout episodes for FSM extraction (L* algorithm)
     epsilon_explore: 0.1      # Injected agent exploration for off-policy coverage
     opponent_deviation: 0.1   # Injected opponent deviations
     record_split: [on_policy, off_policy]  # Fidelity reported separately

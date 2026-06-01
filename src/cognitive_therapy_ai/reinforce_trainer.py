@@ -47,12 +47,22 @@ class SessionStats:
 
 @dataclass
 class TrajectoryStep:
-    """Single step in a trajectory."""
+    """Single step in a trajectory with full behavioral data."""
+    # Agent data
     observation: torch.Tensor  # (d_in,)
     action: int  # 0 or 1
     reward: float
     policy_logits: torch.Tensor  # (2,)
     value: torch.Tensor  # (1,)
+    
+    # Opponent data
+    opponent_action: int  # 0 or 1
+    opponent_reward: float
+    opponent_action_prob: float  # For probabilistic opponents
+    
+    # Episode metadata
+    episode_id: int
+    timestep: int
     done: bool  # True if end of session
 
 
@@ -96,7 +106,7 @@ class SessionEnvironment:
         
         return self.encoder.encode_start_token(game_name=self.game_name)
     
-    def step(self, agent_action: int) -> Tuple[np.ndarray, float, bool]:
+    def step(self, agent_action: int) -> Tuple[np.ndarray, float, bool, int, float, float]:
         """
         Execute one game round.
         
@@ -105,18 +115,34 @@ class SessionEnvironment:
         
         Returns:
             next_obs: Observation encoding current outcome
-            reward: Agent's payoff
+            agent_reward: Agent's payoff
             done: True if session is complete (game_count >= T)
+            opponent_action: Opponent's action (0 or 1)
+            opponent_reward: Opponent's payoff
+            opponent_action_prob: Probability opponent assigned to their action
         """
         # Convert to Action enum
         agent_action_enum = Action.COOPERATE if agent_action == 0 else Action.DEFECT
         
         # Opponent chooses action (memoryless)
         opponent_action_enum = self.opponent.play_action(game_history=[], round_number=0)
+        opponent_action_int = opponent_action_enum.value
         
-        # Get payoffs
+        # Get opponent action probability (for probabilistic opponents)
+        # Check if opponent has a strategy with defection_probability attribute
+        if hasattr(self.opponent, 'strategy') and hasattr(self.opponent.strategy, 'defection_probability'):
+            if opponent_action_enum == Action.COOPERATE:
+                opponent_action_prob = 1.0 - self.opponent.strategy.defection_probability
+            else:
+                opponent_action_prob = self.opponent.strategy.defection_probability
+        else:
+            # For deterministic opponents, set prob to 1.0
+            opponent_action_prob = 1.0
+        
+        # Get payoffs (transpose for opponent's perspective)
         payoff_matrix = self.game.get_payoff_matrix()
-        agent_reward = payoff_matrix[agent_action, opponent_action_enum.value]
+        agent_reward = payoff_matrix[agent_action, opponent_action_int]
+        opponent_reward = payoff_matrix[opponent_action_int, agent_action]  # Transpose
         
         # Update state
         self.agent_last_action = agent_action_enum
@@ -133,7 +159,14 @@ class SessionEnvironment:
         # Check if session is done
         done = (self.game_count >= self.T)
         
-        return next_obs, float(agent_reward), done
+        return (
+            next_obs, 
+            float(agent_reward), 
+            done, 
+            opponent_action_int,
+            float(opponent_reward),
+            float(opponent_action_prob)
+        )
 
 
 class REINFORCETrainer:
@@ -208,17 +241,19 @@ class REINFORCETrainer:
     def train_session_rl(
         self,
         env: SessionEnvironment,
-        max_steps: int = 100
-    ) -> SessionStats:
+        max_steps: int = 100,
+        return_trajectory: bool = False
+    ) -> tuple[SessionStats, List[TrajectoryStep]] | SessionStats:
         """
         Train agent on one session using REINFORCE with GAE.
         
         Args:
             env: Session environment
             max_steps: Maximum steps per session (should match T)
+            return_trajectory: If True, return (stats, trajectory) instead of just stats
         
         Returns:
-            SessionStats with training metrics
+            SessionStats with training metrics, and optionally the full trajectory
         """
         self.agent.train()
         
@@ -245,8 +280,12 @@ class REINFORCETrainer:
             action = torch.multinomial(policy_probs, num_samples=1).item()
             
             # Environment step
-            next_obs, reward, done = env.step(action)
+            next_obs, reward, done, opp_action, opp_reward, opp_prob = env.step(action)
             total_reward += reward
+            
+            # Compute agent action probability
+            policy_probs_np = policy_probs.detach().cpu().numpy()
+            agent_action_prob = float(policy_probs_np[action])
             
             # Store trajectory
             trajectory.append(TrajectoryStep(
@@ -255,6 +294,11 @@ class REINFORCETrainer:
                 reward=reward,
                 policy_logits=policy_logits,
                 value=value,
+                opponent_action=opp_action,
+                opponent_reward=opp_reward,
+                opponent_action_prob=opp_prob,
+                episode_id=-1,  # Set by caller
+                timestep=step,
                 done=done
             ))
             
@@ -305,7 +349,7 @@ class REINFORCETrainer:
         # Compute BR accuracy (for monitoring)
         br_accuracy = self._compute_br_accuracy(env, trajectory)
         
-        return SessionStats(
+        stats = SessionStats(
             total_return=total_reward,
             mean_reward=total_reward / len(trajectory),
             policy_loss=policy_loss.item(),
@@ -313,6 +357,11 @@ class REINFORCETrainer:
             br_accuracy=br_accuracy,
             num_games=len(trajectory)
         )
+        
+        if return_trajectory:
+            return stats, trajectory
+        else:
+            return stats
     
     def train_session_bc(
         self,
@@ -361,8 +410,12 @@ class REINFORCETrainer:
             action = br_action
             
             # Environment step
-            next_obs, reward, done = env.step(action)
+            next_obs, reward, done, opp_action, opp_reward, opp_prob = env.step(action)
             total_reward += reward
+            
+            # Compute agent action probability
+            policy_probs = F.softmax(policy_logits, dim=0)
+            agent_action_prob = float(policy_probs[action].detach().cpu().numpy())
             
             # Store trajectory
             trajectory.append(TrajectoryStep(
@@ -371,6 +424,11 @@ class REINFORCETrainer:
                 reward=reward,
                 policy_logits=policy_logits,
                 value=value,
+                opponent_action=opp_action,
+                opponent_reward=opp_reward,
+                opponent_action_prob=opp_prob,
+                episode_id=-1,
+                timestep=step,
                 done=done
             ))
             
@@ -487,12 +545,14 @@ class REINFORCETrainer:
                 if deterministic:
                     policy_probs = F.softmax(policy_logits, dim=0)
                     action = torch.argmax(policy_probs).item()
+                    agent_action_prob = float(policy_probs[action].detach().cpu().numpy())
                 else:
                     policy_probs = F.softmax(policy_logits, dim=0)
                     action = torch.multinomial(policy_probs, num_samples=1).item()
+                    agent_action_prob = float(policy_probs[action].detach().cpu().numpy())
                 
                 # Environment step
-                next_obs, reward, done = env.step(action)
+                next_obs, reward, done, opp_action, opp_reward, opp_prob = env.step(action)
                 total_reward += reward
                 
                 # Store trajectory
@@ -502,6 +562,11 @@ class REINFORCETrainer:
                     reward=reward,
                     policy_logits=policy_logits,
                     value=value,
+                    opponent_action=opp_action,
+                    opponent_reward=opp_reward,
+                    opponent_action_prob=opp_prob,
+                    episode_id=episode,
+                    timestep=step,
                     done=done
                 ))
                 

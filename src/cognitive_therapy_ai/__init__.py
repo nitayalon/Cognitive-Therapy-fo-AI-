@@ -28,6 +28,7 @@ from .best_response import (
 # Use: from cognitive_therapy_ai.network import GameLSTM
 # Use: from cognitive_therapy_ai.trainer import GameTrainer
 # Use: from cognitive_therapy_ai.tom_rl_loss import ToMRLLoss, AdaptiveToMRLLoss, VanillaRLLoss
+# Use: from cognitive_therapy_ai.trajectory_utils import save_trajectories_jsonl, load_trajectories_jsonl
 # Use: from cognitive_therapy_ai.training_monitor import TrainingMonitor, BatchedTrainingMonitor
 
 __all__ = [
