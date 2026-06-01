@@ -29,6 +29,9 @@ fi
 echo "  ✓ Training job submitted: ${TRAINING_JOB_ID}"
 echo ""
 
+# Allow SLURM controller to process training job submission
+sleep 2
+
 # Step 2: Submit testing jobs with dependency
 echo "STEP 2: Submitting Testing Jobs (with dependency on training)"
 echo "  Total tasks: 11,340 (420 models × 27 test conditions)"
@@ -64,6 +67,8 @@ for BATCH in {0..11}; do
     if [ $? -eq 0 ]; then
         TEST_JOB_IDS+=($JOB_ID)
         echo "    ✓ Job ${JOB_ID}"
+        # Add delay to avoid overwhelming SLURM controller
+        sleep 1
     else
         echo "    ✗ Failed to submit batch ${BATCH}"
         exit 1
