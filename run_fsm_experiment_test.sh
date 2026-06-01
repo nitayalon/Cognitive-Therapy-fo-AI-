@@ -9,11 +9,18 @@
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=00:30:00
 #SBATCH --job-name=fsm_repr_test
-#SBATCH --array=0-11339
+#SBATCH --array=0-999
 
 # FSM REPRESENTATION EXPERIMENT - COMPREHENSIVE TESTING PHASE
-# 11,340 tasks: 420 trained models × 27 test conditions
+# 11,340 tasks TOTAL: 420 trained models × 27 test conditions
 # Test conditions: 3 games × 9 opponents = CROSS-GAME + CROSS-OPPONENT generalization
+# 
+# Due to cluster array limit (1001), this script handles chunks of 1000 tasks
+# Use submit_fsm_test_jobs.sh to submit all chunks automatically
+# Or manually: TASK_OFFSET=0 sbatch run_fsm_experiment_test.sh (tasks 0-999)
+#              TASK_OFFSET=1000 sbatch run_fsm_experiment_test.sh (tasks 1000-1999)
+#              etc.
+#
 # Each task:
 #   1. Load trained checkpoint
 #   2. Evaluate on test game+opponent (possibly unseen)
@@ -47,14 +54,24 @@ fi
 TEST_OUTPUT_DIR="experiments/fsm_representation_test_${SLURM_ARRAY_JOB_ID}"
 mkdir -p "${TEST_OUTPUT_DIR}"
 
+# Handle task offset for multi-batch submission (cluster array limit: 1001)
+TASK_OFFSET=${TASK_OFFSET:-0}
+ACTUAL_TASK_ID=$((TASK_OFFSET + SLURM_ARRAY_TASK_ID))
+
+# Validate task ID is within valid range
+if [ $ACTUAL_TASK_ID -ge 11340 ]; then
+    echo "ERROR: Task ID $ACTUAL_TASK_ID exceeds total tasks (11340)"
+    exit 1
+fi
+
 # Decode array task ID
 # 420 models × 27 test conditions (3 games × 9 opponents) = 11,340 tasks
 GAMES=("prisoners-dilemma" "stag-hunt" "hawk-dove")
 ALL_OPPONENTS=(0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9)  # ALL opponents for comprehensive testing
 
 NUM_TEST_CONDITIONS=27  # 3 games × 9 opponents
-MODEL_ID=$((SLURM_ARRAY_TASK_ID / NUM_TEST_CONDITIONS))
-TEST_COND_ID=$((SLURM_ARRAY_TASK_ID % NUM_TEST_CONDITIONS))
+MODEL_ID=$((ACTUAL_TASK_ID / NUM_TEST_CONDITIONS))
+TEST_COND_ID=$((ACTUAL_TASK_ID % NUM_TEST_CONDITIONS))
 
 # Map test condition to game and opponent
 TEST_GAME_IDX=$((TEST_COND_ID / 9))
@@ -89,7 +106,7 @@ case ${TEST_GAME} in
 esac
 
 echo "=========================================="
-echo "FSM TESTING - Task ${SLURM_ARRAY_TASK_ID}"
+echo "FSM TESTING - Task ${ACTUAL_TASK_ID} (Array ${SLURM_ARRAY_TASK_ID} + Offset ${TASK_OFFSET})"
 echo "Model: ${MODEL_ID} (Condition ${CONDITION_ID}, Seed ${SEED_ID})"
 echo "Test Game: ${TEST_GAME}"
 echo "Test Opponent: ${TEST_OPPONENT}"
@@ -111,4 +128,4 @@ time singularity exec ${CONTAINER_PATH} python run_fsm_experiment.py \
     --save-every-nth-episode 10 \
     --output-dir "$TEST_TASK_DIR"
 
-echo "Task ${SLURM_ARRAY_TASK_ID} complete"
+echo "Task ${ACTUAL_TASK_ID} (Array ${SLURM_ARRAY_TASK_ID}) complete"
