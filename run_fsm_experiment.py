@@ -204,21 +204,22 @@ def train_mode(args):
     )
     
     # Create agent
-    input_size = encoder.get_input_size()
+    input_dim = encoder.get_input_dim()
     agent = RepresentationAgent(
-        input_size=input_size,
-        hidden_size=args.hidden_size,
-        num_actions=2
+        input_dim=input_dim,
+        hidden_size=args.hidden_size
     )
     
-    print(f"  Agent input size: {input_size}")
+    print(f"  Agent input size: {input_dim}")
     print(f"  Agent parameters: {sum(p.numel() for p in agent.parameters())}")
+    
+    # Create optimizer
+    optimizer = torch.optim.Adam(agent.parameters(), lr=base_config['train']['lr'])
     
     # Create trainer
     trainer = REINFORCETrainer(
         agent=agent,
-        encoder=encoder,
-        learning_rate=base_config['train']['learning_rate'],
+        optimizer=optimizer,
         gamma=base_config['train']['gamma'],
         gae_lambda=base_config['train']['gae_lambda']
     )
@@ -246,7 +247,7 @@ def train_mode(args):
             return_trajectory=True
         )
         
-        episode_rewards.append(stats.total_reward)
+        episode_rewards.append(stats.total_return)
         
         # Collect trajectories if requested
         if args.save_trajectories:
@@ -322,7 +323,7 @@ def train_mode(args):
                 'opponent_coop': opponent_coop,
                 'hidden_size': args.hidden_size,
                 'input_condition': args.input_condition,
-                'input_size': input_size,
+                'input_dim': input_dim,
                 'seed': args.seed
             },
             'train_metrics': train_metrics,
@@ -369,9 +370,8 @@ def test_mode(args):
     
     # Create agent and load weights
     agent = RepresentationAgent(
-        input_size=config['input_size'],
-        hidden_size=config['hidden_size'],
-        num_actions=2
+        input_dim=config['input_dim'],
+        hidden_size=config['hidden_size']
     )
     agent.load_state_dict(checkpoint['agent_state_dict'])
     agent.eval()
@@ -402,11 +402,11 @@ def test_mode(args):
                 game_name=game_abbr
             )
             
-            # Create trainer for evaluation
+            # Create trainer for evaluation (optimizer not used during eval)
+            optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
             trainer = REINFORCETrainer(
                 agent=agent,
-                encoder=encoder,
-                learning_rate=0.001  # Not used during evaluation
+                optimizer=optimizer
             )
             
             # Run test episodes
@@ -418,7 +418,7 @@ def test_mode(args):
                     env,
                     return_trajectory=True
                 )
-                episode_rewards.append(stats.total_reward)
+                episode_rewards.append(stats.total_return)
                 
                 if args.save_trajectories:
                     test_trajectories.extend(trajectories)

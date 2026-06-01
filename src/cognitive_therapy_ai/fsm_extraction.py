@@ -151,7 +151,8 @@ class RolloutCollector:
             hidden_states.append(h_t)
             
             # Step environment (action is integer 0 or 1)
-            next_obs, reward, done = env.step(action)
+            # Note: step() returns 6 values, but we only need the first 3 for FSM extraction
+            next_obs, reward, done, _, _, _ = env.step(action)
             
             # Convert action to Action enum for storage
             action_enum = Action.COOPERATE if action == 0 else Action.DEFECT
