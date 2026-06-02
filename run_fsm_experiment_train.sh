@@ -7,7 +7,7 @@
 #SBATCH --mem=8G
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
-#SBATCH --time=02:00:00
+#SBATCH --time=08:00:00
 #SBATCH --job-name=fsm_repr_train
 #SBATCH --array=0-419
 
