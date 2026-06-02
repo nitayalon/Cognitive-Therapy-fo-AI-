@@ -51,8 +51,8 @@ for BATCH in {0..11}; do
     if [ $? -eq 0 ]; then
         JOB_IDS+=($JOB_ID)
         echo "  ✓ Submitted: Job ${JOB_ID}"
-        # Add delay to avoid overwhelming SLURM controller
-        sleep 1
+        # Add delay to avoid overwhelming SLURM controller (increased for stability)
+        sleep 3
     else
         echo "  ✗ Failed to submit batch ${BATCH}"
         exit 1
