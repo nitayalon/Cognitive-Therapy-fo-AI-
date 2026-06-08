@@ -85,7 +85,7 @@ echo "Input condition: ${INPUT_CONDITION}"
 echo "Seed: ${SEED}"
 echo ""
 
-# Run training ONLY (no FSM extraction - will do separately)
+# Run training with episode-level metrics (no full trajectories - will extract FSM separately)
 time singularity exec ${CONTAINER_PATH} python run_fsm_experiment.py \
     --mode train \
     --game ${GAME} \
@@ -95,6 +95,8 @@ time singularity exec ${CONTAINER_PATH} python run_fsm_experiment.py \
     --seed ${SEED} \
     --n-episodes 10000 \
     --save-checkpoint \
+    --save-trajectories \
+    --save-every-nth-episode 100 \
     --output-dir "${ARRAY_OUTPUT_DIR}/task_${SLURM_ARRAY_TASK_ID}"
 
 echo "Task ${SLURM_ARRAY_TASK_ID} complete"
