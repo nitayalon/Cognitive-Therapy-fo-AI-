@@ -118,7 +118,7 @@ TEST_TASK_DIR="${TEST_OUTPUT_DIR}/model_${MODEL_ID}_test_${GAME_ABBR}_${TEST_OPP
 mkdir -p "$TEST_TASK_DIR"
 
 # Run testing + FSM extraction on test condition
-time singularity exec ${CONTAINER_PATH} python run_fsm_experiment.py \
+time singularity exec ${CONTAINER_PATH} python -u run_fsm_experiment.py \
     --mode test \
     --checkpoint-path "$CHECKPOINT_PATH" \
     --test-games ${TEST_GAME} \

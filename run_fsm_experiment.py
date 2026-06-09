@@ -308,25 +308,25 @@ def train_mode(args):
     episode_rewards = []
     
     for episode in range(args.n_episodes):
-        # Train with trajectory collection
-        stats, trajectories = trainer.train_session_rl(
-            env,
-            return_trajectory=True
-        )
-        
+        # Only collect trajectory data on episodes we intend to save, to avoid
+        # accumulating 1M+ live PyTorch tensors that slow training 5-10x.
+        need_trajectory = args.save_trajectories and (episode % args.save_every_nth_episode == 0)
+
+        if need_trajectory:
+            stats, trajectories = trainer.train_session_rl(env, return_trajectory=True)
+            all_trajectories.append(trajectories)  # list-of-lists, not flat extend
+        else:
+            stats = trainer.train_session_rl(env, return_trajectory=False)
+
         episode_rewards.append(stats.total_return)
-        
-        # Collect trajectories if requested
-        if args.save_trajectories:
-            all_trajectories.extend(trajectories)
-        
+
         # Progress reporting
         if (episode + 1) % 1000 == 0:
             recent_rewards = episode_rewards[-100:]
             mean_reward = np.mean(recent_rewards)
             std_reward = np.std(recent_rewards)
             print(f"  Episode {episode+1}/{args.n_episodes}: "
-                  f"Reward = {mean_reward:.1f} ± {std_reward:.1f}")
+                  f"Reward = {mean_reward:.1f} ± {std_reward:.1f}", flush=True)
     
     training_time = time.time() - start_time
     
@@ -355,13 +355,12 @@ def train_mode(args):
     if args.save_trajectories:
         print_section("SAVING TRAJECTORIES")
         traj_path = output_dir / 'trajectories_train.jsonl.gz'
-        save_episode_trajectories(
+        n_saved = save_episode_trajectories(
             all_trajectories,
             traj_path,
-            subsample_every_nth=args.save_every_nth_episode
+            save_every_nth=1  # already subsampled every args.save_every_nth_episode during collection
         )
-        print(f"  Saved {len(all_trajectories)} trajectory steps to {traj_path}")
-        print(f"  Subsampling: every {args.save_every_nth_episode} episodes")
+        print(f"  Saved {n_saved} episodes ({len(all_trajectories)} collected) to {traj_path}")
     
     # FSM extraction
     print_section("FSM EXTRACTION (TRAINING DATA)")
@@ -480,14 +479,13 @@ def test_mode(args):
             test_trajectories = []
             
             for episode in range(args.n_test_episodes):
-                stats, trajectories = trainer.train_session_rl(
-                    env,
-                    return_trajectory=True
-                )
+                need_trajectory = args.save_trajectories and (episode % args.save_every_nth_episode == 0)
+                if need_trajectory:
+                    stats, trajectories = trainer.train_session_rl(env, return_trajectory=True)
+                    test_trajectories.append(trajectories)  # list-of-lists
+                else:
+                    stats = trainer.train_session_rl(env, return_trajectory=False)
                 episode_rewards.append(stats.total_return)
-                
-                if args.save_trajectories:
-                    test_trajectories.extend(trajectories)
             
             # Compute statistics
             mean_reward = np.mean(episode_rewards)
@@ -515,7 +513,7 @@ def test_mode(args):
             test_results.append(result)
             
             if args.save_trajectories:
-                all_trajectories.extend(test_trajectories)
+                all_trajectories.extend(test_trajectories)  # extend list-of-lists
     
     # Save test results
     print_section("SAVING TEST RESULTS")
@@ -537,13 +535,12 @@ def test_mode(args):
     # Save trajectories
     if args.save_trajectories:
         traj_path = output_dir / 'trajectories_test.jsonl.gz'
-        save_episode_trajectories(
+        n_saved = save_episode_trajectories(
             all_trajectories,
             traj_path,
-            subsample_every_nth=args.save_every_nth_episode
+            save_every_nth=1  # already subsampled every args.save_every_nth_episode during collection
         )
-        print(f"  Saved {len(all_trajectories)} trajectory steps to {traj_path}")
-        print(f"  Subsampling: every {args.save_every_nth_episode} episodes")
+        print(f"  Saved {n_saved} episodes ({len(all_trajectories)} collected) to {traj_path}")
     
     # Print summary table
     print_section("TEST SUMMARY")
@@ -551,7 +548,7 @@ def test_mode(args):
     print('-' * 70)
     for r in test_results:
         reward_str = f"{r['reward_mean']:.1f} ± {r['reward_std']:.1f}"
-        fidelity_str = f"{r['fidelity_train']:.3f}"
+        fidelity_str = f"{r['fidelity_test']:.3f}"
         states_str = f"{r['minimized_states']}"
         print(f"{r['test_game']:<20} {r['test_opponent_coop']:<10} {reward_str:<15} {fidelity_str:<10} {states_str:<10}")
     

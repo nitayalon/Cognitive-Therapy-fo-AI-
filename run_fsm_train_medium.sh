@@ -2,8 +2,8 @@
 #SBATCH -o ./slurm_logs/fsm_train_medium_%x_%A_%a.out
 #SBATCH -e ./slurm_logs/fsm_train_medium_%x_%A_%a.err
 #SBATCH -D ./
-#SBATCH --partition=highmem
-#SBATCH --cpus-per-task=2
+#SBATCH --partition=compute
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
@@ -75,7 +75,7 @@ echo "Seed: ${SEED}"
 echo ""
 
 # Run training with episode-level metrics (no full trajectories - will extract FSM separately)
-time singularity exec ${CONTAINER_PATH} python run_fsm_experiment.py \
+time singularity exec ${CONTAINER_PATH} python -u run_fsm_experiment.py \
     --mode train \
     --game ${GAME} \
     --opponent ${OPPONENT} \

@@ -110,7 +110,7 @@ echo "Hidden size: ${HIDDEN_SIZE}"
 echo "Input condition: ${INPUT_CONDITION}"
 
 # Run training + FSM extraction
-time singularity exec ${CONTAINER_PATH} python run_fsm_experiment.py \
+time singularity exec ${CONTAINER_PATH} python -u run_fsm_experiment.py \
     --mode train \
     --game ${GAME} \
     --opponent ${OPPONENT} \
