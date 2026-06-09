@@ -1,17 +1,17 @@
 #!/bin/bash -l
-#SBATCH -o ./slurm_logs/fsm_train_large_%x_%A_%a.out
-#SBATCH -e ./slurm_logs/fsm_train_large_%x_%A_%a.err
+#SBATCH -o ./slurm_logs/fsm_train_tiny_%x_%A_%a.out
+#SBATCH -e ./slurm_logs/fsm_train_tiny_%x_%A_%a.err
 #SBATCH -D ./
 #SBATCH --partition=compute
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --mem=8G
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=24:00:00
-#SBATCH --job-name=fsm_train_large
+#SBATCH --job-name=fsm_train_tiny
 #SBATCH --array=0-29
 
-# FSM REPRESENTATION EXPERIMENT - TRAINING PHASE (LARGE NETWORKS, H=16)
+# FSM REPRESENTATION EXPERIMENT - TRAINING PHASE (TINY NETWORKS, H=2)
 # 30 tasks: 3 games x 10 seeds
 # Each task trains 5 agents (one per opponent: 0.1, 0.3, 0.5, 0.7, 0.9)
 # Results saved to opp_X.X/ subdirectories within each task output dir
@@ -37,14 +37,14 @@ SEED_IDX=$((SLURM_ARRAY_TASK_ID % 10))
 
 GAME=${GAMES[$GAME_IDX]}
 SEED=${SEED_VALUES[$SEED_IDX]}
-HIDDEN_SIZE=16
+HIDDEN_SIZE=2
 INPUT_CONDITION="no_game"
 
-ARRAY_OUTPUT_DIR="experiments/fsm_train_large_${SLURM_ARRAY_JOB_ID}"
+ARRAY_OUTPUT_DIR="experiments/fsm_train_tiny_${SLURM_ARRAY_JOB_ID}"
 mkdir -p "${ARRAY_OUTPUT_DIR}/task_${SLURM_ARRAY_TASK_ID}"
 
 echo "=========================================="
-echo "FSM TRAINING (LARGE H=16) - Task ${SLURM_ARRAY_TASK_ID}"
+echo "FSM TRAINING (TINY H=2) - Task ${SLURM_ARRAY_TASK_ID}"
 echo "=========================================="
 echo "Game:            ${GAME}"
 echo "Hidden size:     ${HIDDEN_SIZE}"

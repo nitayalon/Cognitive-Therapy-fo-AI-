@@ -9,13 +9,12 @@
 #SBATCH --mail-user=nitay.alon@tuebingen.mpg.de
 #SBATCH --time=24:00:00
 #SBATCH --job-name=fsm_train_medium
-#SBATCH --array=0-119
+#SBATCH --array=0-29
 
-# FSM REPRESENTATION EXPERIMENT - TRAINING PHASE (MEDIUM NETWORKS)
-# 120 tasks: H=8 networks only
-# Breakdown:
-#   - no_game H=8: 60 tasks (3 games × 2 opponents × 10 seeds)
-#   - game_tag H=8: 60 tasks
+# FSM REPRESENTATION EXPERIMENT - TRAINING PHASE (MEDIUM NETWORKS, H=8)
+# 30 tasks: 3 games x 10 seeds
+# Each task trains 5 agents (one per opponent: 0.1, 0.3, 0.5, 0.7, 0.9)
+# Results saved to opp_X.X/ subdirectories within each task output dir
 
 module purge
 module load singularity
@@ -23,62 +22,41 @@ module load singularity
 export SINGULARITY_BIND="/run,/ptmp,/scratch,/tmp,/opt/ohpc,${HOME}"
 export CONTAINER_PATH=/ptmp/containers/pytorch_1.10.0-cuda.11.3_latest-2021-12-02-ec95d31ea677.sif
 export PYTHONPATH="${PWD}/src:${PYTHONPATH}"
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
 
 mkdir -p slurm_logs
 mkdir -p experiments
 
-# Nested array calculation
-NUM_SEEDS=10
+GAMES=("prisoners-dilemma" "stag-hunt" "hawk-dove")
 SEED_VALUES=(42 123 456 789 1011 1213 1415 1617 1819 2021)
 
-# Task mapping for medium networks
-# Tasks 0-59: no_game H=8
-# Tasks 60-119: game_tag H=8
-
-GAMES=("prisoners-dilemma" "stag-hunt" "hawk-dove")
-OPPONENTS=(0.1 0.7)
-HIDDEN_SIZE=8
-
-if [ $SLURM_ARRAY_TASK_ID -lt 60 ]; then
-    # no_game H=8 (tasks 0-59)
-    INPUT_CONDITION="no_game"
-    LOCAL_TASK=$SLURM_ARRAY_TASK_ID
-    GAME_IDX=$((LOCAL_TASK / 20))
-    OPP_IDX=$(((LOCAL_TASK / 10) % 2))
-    SEED_ID=$((LOCAL_TASK % 10))
-else
-    # game_tag H=8 (tasks 60-119)
-    INPUT_CONDITION="game_tag"
-    LOCAL_TASK=$((SLURM_ARRAY_TASK_ID - 60))
-    GAME_IDX=$((LOCAL_TASK / 20))
-    OPP_IDX=$(((LOCAL_TASK / 10) % 2))
-    SEED_ID=$((LOCAL_TASK % 10))
-fi
+# Task ID -> (game, seed)
+GAME_IDX=$((SLURM_ARRAY_TASK_ID / 10))
+SEED_IDX=$((SLURM_ARRAY_TASK_ID % 10))
 
 GAME=${GAMES[$GAME_IDX]}
-OPPONENT=${OPPONENTS[$OPP_IDX]}
-SEED=${SEED_VALUES[$SEED_ID]}
+SEED=${SEED_VALUES[$SEED_IDX]}
+HIDDEN_SIZE=8
+INPUT_CONDITION="no_game"
 
-# Output directory
 ARRAY_OUTPUT_DIR="experiments/fsm_train_medium_${SLURM_ARRAY_JOB_ID}"
-mkdir -p "${ARRAY_OUTPUT_DIR}"
 mkdir -p "${ARRAY_OUTPUT_DIR}/task_${SLURM_ARRAY_TASK_ID}"
 
 echo "=========================================="
-echo "FSM TRAINING (MEDIUM) - Task ${SLURM_ARRAY_TASK_ID}"
+echo "FSM TRAINING (MEDIUM H=8) - Task ${SLURM_ARRAY_TASK_ID}"
 echo "=========================================="
-echo "Game: ${GAME}"
-echo "Opponent: ${OPPONENT}"
-echo "Hidden size: ${HIDDEN_SIZE}"
+echo "Game:            ${GAME}"
+echo "Hidden size:     ${HIDDEN_SIZE}"
 echo "Input condition: ${INPUT_CONDITION}"
-echo "Seed: ${SEED}"
+echo "Seed:            ${SEED}"
+echo "Opponents:       0.1 0.3 0.5 0.7 0.9"
 echo ""
 
-# Run training with episode-level metrics (no full trajectories - will extract FSM separately)
 time singularity exec ${CONTAINER_PATH} python -u run_fsm_experiment.py \
     --mode train \
     --game ${GAME} \
-    --opponent ${OPPONENT} \
+    --opponents 0.1 0.3 0.5 0.7 0.9 \
     --hidden-size ${HIDDEN_SIZE} \
     --input-condition ${INPUT_CONDITION} \
     --seed ${SEED} \
