@@ -398,7 +398,7 @@ def test_mode(args):
     
     # Load checkpoint
     print(f"\nLoading checkpoint from {args.checkpoint_path}")
-    checkpoint = torch.load(args.checkpoint_path, map_location='cpu', weights_only=False)
+    checkpoint = torch.load(args.checkpoint_path, map_location='cpu')
     
     config = checkpoint['config']
     print(f"  Trained on: {config['game']}")
