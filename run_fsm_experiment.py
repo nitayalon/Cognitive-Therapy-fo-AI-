@@ -434,6 +434,11 @@ def test_mode(args):
         game = GameFactory.create_game(test_game)
         
         for test_opponent_coop in args.test_opponents:
+            if (args.exclude_train_combo and test_game == config['game']
+                    and test_opponent_coop == config['opponent_coop']):
+                print(f"\n  Skipping {test_game} vs {test_opponent_coop} (training combo)")
+                continue
+
             print_section(f"Testing: {test_game} vs {test_opponent_coop}")
             
             # Create opponent and environment
@@ -574,6 +579,8 @@ def main():
                         help='Opponent cooperation probabilities for testing (required for test mode)')
     parser.add_argument('--n-test-episodes', type=int, default=100,
                         help='Number of test episodes per condition (default: 100)')
+    parser.add_argument('--exclude-train-combo', action='store_true',
+                        help='Skip the (game, opponent) combo the checkpoint was trained on (test mode)')
     
     # Trajectory saving arguments
     parser.add_argument('--save-trajectories', action='store_true',
