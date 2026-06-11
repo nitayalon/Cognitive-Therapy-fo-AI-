@@ -344,6 +344,155 @@ def _train_one_opponent(args, base_config, encoder, game, game_abbr, opponent_co
     return train_metrics
 
 
+def _train_generalist(args, base_config, encoder, game, game_abbr, opponent_set, output_dir):
+    """
+    Train one agent on a single game whose opponent's cooperation probability is
+    resampled every episode from `opponent_set`, extract an FSM at each opponent
+    level, and save all results.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    input_dim = encoder.get_input_dim()
+
+    agent = RepresentationAgent(input_dim=input_dim, hidden_size=args.hidden_size)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=base_config['train']['lr'])
+    trainer = REINFORCETrainer(
+        agent=agent,
+        optimizer=optimizer,
+        gamma=base_config['train']['gamma'],
+        gae_lambda=base_config['train']['gae_lambda']
+    )
+
+    initial_opponent = OpponentFactory.create_probabilistic_opponent(
+        defection_probability=1.0 - opponent_set[0]
+    )
+    env = SessionEnvironment(
+        game=game, opponent=initial_opponent, encoder=encoder, T=100, game_name=game_abbr
+    )
+
+    # Training loop
+    print_section(f"TRAINING (GENERALIST)  opponent_set={opponent_set}")
+    start_time = time.time()
+    all_trajectories = []
+    episode_rewards = []
+    episode_opponent_coops = []
+
+    for episode in range(args.n_episodes):
+        # Resample the opponent's cooperation probability for this episode
+        opponent_coop = float(np.random.choice(opponent_set))
+        env.opponent = OpponentFactory.create_probabilistic_opponent(
+            defection_probability=1.0 - opponent_coop
+        )
+        episode_opponent_coops.append(opponent_coop)
+
+        need_trajectory = args.save_trajectories and (episode % args.save_every_nth_episode == 0)
+        if need_trajectory:
+            stats, trajectories = trainer.train_session_rl(env, return_trajectory=True)
+            all_trajectories.append(trajectories)
+        else:
+            stats = trainer.train_session_rl(env, return_trajectory=False)
+        episode_rewards.append(stats.total_return)
+
+        if (episode + 1) % 1000 == 0:
+            mean_r = np.mean(episode_rewards[-100:])
+            std_r = np.std(episode_rewards[-100:])
+            print(f"  Episode {episode+1}/{args.n_episodes}: "
+                  f"Reward = {mean_r:.1f} ± {std_r:.1f}", flush=True)
+
+    training_time = time.time() - start_time
+    print(f"\n  Training completed in {training_time:.1f}s")
+    print(f"  Final reward: {np.mean(episode_rewards[-100:]):.1f} ± {np.std(episode_rewards[-100:]):.1f}")
+
+    # Per-opponent reward stats over the final stretch of training
+    final_window = min(len(episode_rewards), 100 * len(opponent_set))
+    final_rewards = np.array(episode_rewards[-final_window:])
+    final_opponents = np.array(episode_opponent_coops[-final_window:])
+    final_reward_by_opponent = {}
+    for opp in opponent_set:
+        mask = final_opponents == opp
+        if mask.any():
+            final_reward_by_opponent[f"{opp:.1f}"] = {
+                'mean': float(final_rewards[mask].mean()),
+                'std': float(final_rewards[mask].std()),
+                'n': int(mask.sum())
+            }
+
+    # Save training metrics (interim save — written before FSM extraction)
+    train_metrics = {
+        'game': args.game,
+        'training_mode': 'generalist',
+        'opponent_set': [float(o) for o in opponent_set],
+        'episode_opponent_coop': episode_opponent_coops,
+        'hidden_size': args.hidden_size,
+        'input_condition': args.input_condition,
+        'n_episodes': args.n_episodes,
+        'seed': args.seed,
+        'final_reward_mean': float(np.mean(episode_rewards[-100:])),
+        'final_reward_std': float(np.std(episode_rewards[-100:])),
+        'final_reward_by_opponent': final_reward_by_opponent,
+        'all_rewards': [float(r) for r in episode_rewards],
+        'training_time_sec': float(training_time)
+    }
+    with open(output_dir / 'train_metrics.json', 'w') as f:
+        json.dump(train_metrics, f, indent=2)
+
+    # Save trajectories
+    if args.save_trajectories:
+        print_section("SAVING TRAJECTORIES")
+        traj_path = output_dir / 'trajectories_train.jsonl.gz'
+        n_saved = save_episode_trajectories(
+            all_trajectories, traj_path, save_every_nth=1
+        )
+        print(f"  Saved {n_saved} episodes to {traj_path}")
+
+    # FSM extraction at each opponent level
+    print_section("FSM EXTRACTION (per opponent level)")
+    fsm_results = []
+    for opponent_coop in opponent_set:
+        print(f"\n  -- opponent_coop={opponent_coop:.1f} --")
+        fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr)
+        fsm_results.append({
+            'opponent_coop': float(opponent_coop),
+            'fidelity_train': fsm_data['fidelity'],
+            'geometric_states': fsm_data['geometric_states'],
+            'lstar_states': fsm_data['lstar_states'],
+            'minimized_states': fsm_data['minimized_states'],
+            'fsm_structure': fsm_data['fsm_structure']
+        })
+
+    fidelity_data = {
+        'training_mode': 'generalist',
+        'opponent_set': [float(o) for o in opponent_set],
+        'results': fsm_results
+    }
+    with open(output_dir / 'fidelity_train.json', 'w') as f:
+        json.dump(fidelity_data, f, indent=2)
+
+    # Save checkpoint
+    if args.save_checkpoint:
+        checkpoint = {
+            'agent_state_dict': agent.state_dict(),
+            'config': {
+                'game': args.game,
+                'opponent_coop': None,
+                'training_mode': 'generalist',
+                'opponent_set': [float(o) for o in opponent_set],
+                'hidden_size': args.hidden_size,
+                'input_condition': args.input_condition,
+                'input_dim': input_dim,
+                'seed': args.seed
+            },
+            'train_metrics': train_metrics,
+            'fidelity': fidelity_data
+        }
+        checkpoint_path = output_dir / 'checkpoint.pth'
+        torch.save(checkpoint, checkpoint_path)
+        print(f"  Saved checkpoint to {checkpoint_path}", flush=True)
+
+    return train_metrics
+
+
 def train_mode(args):
     """Run training mode — loops over all opponents within a single job."""
     print_section("TRAINING MODE")
@@ -355,6 +504,27 @@ def train_mode(args):
     game_abbr = GAME_ABBR[args.game]
     game = GameFactory.create_game(args.game)
     encoder = ObservationEncoder(input_condition=args.input_condition)
+
+    base_output = Path(args.output_dir)
+    base_output.mkdir(parents=True, exist_ok=True)
+
+    if args.generalist:
+        print(f"\nConfiguration:")
+        print(f"  Game: {args.game} ({game_abbr})")
+        print(f"  Mode: GENERALIST (opponent resampled each episode from {args.opponent_set})")
+        print(f"  Hidden size: {args.hidden_size}")
+        print(f"  Input condition: {args.input_condition}")
+        print(f"  Training episodes: {args.n_episodes}")
+        print(f"  Random seed: {args.seed}")
+        print(f"  Output directory: {args.output_dir}")
+        print(f"  Agent input size: {encoder.get_input_dim()}")
+        print(f"  Agent parameters: {sum(p.numel() for p in RepresentationAgent(encoder.get_input_dim(), args.hidden_size).parameters())}")
+
+        _train_generalist(args, base_config, encoder, game, game_abbr, args.opponent_set, base_output)
+
+        print_section("GENERALIST TRAINING COMPLETE")
+        print(f"  Output directory: {base_output}")
+        return
 
     # Support both --opponent (single) and --opponents (multi)
     opponent_list = args.opponents if args.opponents else [args.opponent]
@@ -369,9 +539,6 @@ def train_mode(args):
     print(f"  Output directory: {args.output_dir}")
     print(f"  Agent input size: {encoder.get_input_dim()}")
     print(f"  Agent parameters: {sum(p.numel() for p in RepresentationAgent(encoder.get_input_dim(), args.hidden_size).parameters())}")
-
-    base_output = Path(args.output_dir)
-    base_output.mkdir(parents=True, exist_ok=True)
 
     for i, opponent_coop in enumerate(opponent_list):
         print_section(f"OPPONENT {i+1}/{len(opponent_list)}: coop={opponent_coop:.1f}")
@@ -402,7 +569,10 @@ def test_mode(args):
     
     config = checkpoint['config']
     print(f"  Trained on: {config['game']}")
-    print(f"  Opponent cooperation: {config['opponent_coop']}")
+    if config.get('training_mode') == 'generalist':
+        print(f"  Training mode: generalist (opponent_set={config.get('opponent_set')})")
+    else:
+        print(f"  Opponent cooperation: {config['opponent_coop']}")
     print(f"  Hidden size: {config['hidden_size']}")
     print(f"  Input condition: {config['input_condition']}")
     
@@ -557,6 +727,14 @@ def main():
                         help='Single opponent cooperation probability (train mode)')
     parser.add_argument('--opponents', type=float, nargs='+',
                         help='Multiple opponent cooperation probabilities; each trains a separate agent in sequence (train mode). Use instead of --opponent.')
+    parser.add_argument('--generalist', action='store_true',
+                        help='Train a single agent on --game with the opponent cooperation '
+                             'probability resampled every episode from --opponent-set, '
+                             'instead of training one agent per fixed opponent (train mode).')
+    parser.add_argument('--opponent-set', type=float, nargs='+', default=[0.1, 0.3, 0.5, 0.7, 0.9],
+                        help='Opponent cooperation probabilities to sample from during '
+                             '--generalist training, and to use for train-time FSM/fidelity '
+                             'extraction (default: 0.1 0.3 0.5 0.7 0.9)')
     parser.add_argument('--hidden-size', type=int, default=4,
                         help='LSTM hidden size (default: 4)')
     parser.add_argument('--input-condition', type=str, default='no_game',
@@ -594,8 +772,8 @@ def main():
     if args.mode == 'train':
         if args.game is None:
             parser.error("--game is required for train mode")
-        if args.opponent is None and not args.opponents:
-            parser.error("either --opponent or --opponents is required for train mode")
+        if not args.generalist and args.opponent is None and not args.opponents:
+            parser.error("either --opponent, --opponents, or --generalist is required for train mode")
     elif args.mode == 'test':
         if args.checkpoint_path is None or args.test_games is None or args.test_opponents is None:
             parser.error("--checkpoint-path, --test-games, and --test-opponents are required for test mode")
