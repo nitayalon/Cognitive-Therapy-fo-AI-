@@ -1,0 +1,135 @@
+---
+title: "plot network training results"
+output: html_document
+date: "2026-06-11"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(here)
+library(colorspace)
+library(caret)
+library(patchwork)
+library(plotly)
+library(ks)
+library(ggpubr)
+library(rstatix)
+library(corrr)
+library(emmeans)
+library(effsize)
+library(ARTool)
+library(car)        
+library(forcats) 
+library(RColorBrewer)
+library(wesanderson)
+```
+
+
+```{r Plotting settings for aliasing on windows, include=FALSE}
+# Plotting settings for aliasing on windows
+# Enable anti-aliasing on Windows
+if(Sys.info()['sysname'] == "Windows"){
+  
+  trace(grDevices::png, quote({
+    if (missing(type) && missing(antialias)) {
+      type <- "cairo-png"
+      antialias <- "subpixel"
+    }
+  }), print = FALSE)
+  
+  
+  # Enable anti-aliasing on Windows
+  trace(grDevices:::png, quote({
+    if (missing(type) && missing(antialias)) {
+      type <- "cairo-png"
+      antialias <- "subpixel"
+    }
+  }), print = FALSE)
+  
+  
+}
+
+# Define general plot style and style
+base_size = 15
+theme_set(theme_classic(base_size = base_size))
+
+parse_experiment_file <- function(file_name)
+{
+  parameters_list <- strsplit(file_name, "_")[[1]]
+  alpha = parameters_list[4]
+  receiver_threshold = parameters_list[7]
+  sender_threshold = parameters_list[10]
+  return(c(alpha, receiver_threshold, sender_threshold))
+}
+```
+
+```{r define games and opponents colours, include=FALSE}
+custom_colors <- list(
+  opponents = brewer.pal(5, "Reds")[c(2,5)]
+)
+
+game_colours <- c("#9363A6", "#E6007E","#F191BC")
+gam_names <- c("PD", "SH", "HD")
+
+dynamics_plot_aspect_ratio <- .8
+accept_rejct_point_size <- 2.5
+figure_font_size = 15
+game_line_width = 1.5
+belief_line_width = 2.5
+shape_size = 6
+dynamics_plot_aspect_ratio = 0.8
+```
+
+
+```{r load training data}
+training_data_rewards <- read.csv("../results/fsm_representation/training_rewards.csv.gz")
+training_data_behaviour <- read.csv("../results/fsm_representation/training_policy.csv.gz")
+```
+
+
+
+```{r loss by game and network size}
+pd_loss_by_game_opponent_and_network_size <- 
+  training_data_rewards %>% 
+  filter(game == "hawk-dove") %>% 
+  group_by(hidden_size, opponent, episode) %>% 
+  summarise(mean_reward = mean(reward)) %>% 
+  ggplot(aes(x = episode, y = mean_reward, colour = factor(opponent)))+
+  geom_point() + 
+  geom_line() + 
+  facet_wrap(. ~ factor(hidden_size))
+
+loss_by_game_opponent_and_network_size
+```
+```{r pd policy per network}
+training_data_behaviour %>% 
+  filter(game == "stag-hunt") %>% 
+  group_by(hidden_size, opponent, episode) %>% 
+  summarise(mean_coop = mean(agent_cooperation_prob)) %>% 
+  ggplot(aes(x = episode, y = mean_coop, colour = factor(opponent)))+
+  geom_point() + 
+  geom_line() + 
+  facet_wrap(. ~ factor(hidden_size))
+
+```
+
+```{r FSM fiedality score}
+training_data %>% 
+  filter(game == "stag-hunt") %>% 
+  group_by(hidden_size, opponent) %>% 
+  summarise(mean_fidelity = mean(fidelity), std_fidelity = sd(fidelity),
+            mean_minimal_fsm = mean(minimized_states), minimal_fsm_std = sd(minimized_states)) %>% 
+  ggplot(aes(x = hidden_size, y = mean_fidelity, colour = factor(opponent)))+
+  geom_point() + 
+  geom_line()
+
+training_data %>% 
+  filter(game == "prisoners-dilemma") %>% 
+  group_by(hidden_size, opponent) %>% 
+  summarise(mean_fidelity = mean(fidelity), std_fidelity = sd(fidelity),
+            mean_minimal_fsm = mean(minimized_states), minimal_fsm_std = sd(minimized_states)) %>% 
+  ggplot(aes(x = hidden_size, y = mean_minimal_fsm, colour = factor(opponent)))+
+  geom_point() + 
+  geom_line()
+```
+
