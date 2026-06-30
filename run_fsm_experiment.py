@@ -239,6 +239,28 @@ def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr, min_tr
     }
 
 
+def _take_fsm_snapshot(agent, encoder, game, opponent_coop, game_abbr, min_transition_visits, epoch):
+    """
+    Extract and minimize the FSM for the agent's current weights and package
+    it as one entry of an FSM-size-over-training trajectory.
+
+    Used both for the periodic in-training snapshots (every
+    --fsm-snapshot-interval episodes) and for the final post-training
+    extraction, so the trajectory's last point is directly comparable to the
+    earlier ones.
+    """
+    fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr, min_transition_visits)
+    return {
+        'epoch': int(epoch),
+        'opponent_coop': float(opponent_coop),
+        'fidelity_train': fsm_data['fidelity'],
+        'geometric_states': fsm_data['geometric_states'],
+        'lstar_states': fsm_data['lstar_states'],
+        'minimized_states': fsm_data['minimized_states'],
+        'fsm_structure': fsm_data['fsm_structure']
+    }
+
+
 def _train_one_opponent(args, base_config, encoder, game, game_abbr, opponent_coop, output_dir):
     """
     Train one agent against one opponent, extract FSM, and save all results.
@@ -269,6 +291,7 @@ def _train_one_opponent(args, base_config, encoder, game, game_abbr, opponent_co
     start_time = time.time()
     all_trajectories = []
     episode_rewards = []
+    fsm_snapshots = []
 
     for episode in range(args.n_episodes):
         need_trajectory = args.save_trajectories and (episode % args.save_every_nth_episode == 0)
@@ -284,6 +307,13 @@ def _train_one_opponent(args, base_config, encoder, game, game_abbr, opponent_co
             std_r = np.std(episode_rewards[-100:])
             print(f"  Episode {episode+1}/{args.n_episodes}: "
                   f"Reward = {mean_r:.1f} ± {std_r:.1f}", flush=True)
+
+        if args.fsm_snapshot_interval > 0 and (episode + 1) % args.fsm_snapshot_interval == 0:
+            print(f"  Taking FSM snapshot at epoch {episode+1}...", flush=True)
+            fsm_snapshots.append(_take_fsm_snapshot(
+                agent, encoder, game, opponent_coop, game_abbr,
+                args.min_transition_visits, episode + 1
+            ))
 
     training_time = time.time() - start_time
     print(f"\n  Training completed in {training_time:.1f}s")
@@ -314,19 +344,43 @@ def _train_one_opponent(args, base_config, encoder, game, game_abbr, opponent_co
         )
         print(f"  Saved {n_saved} episodes to {traj_path}")
 
-    # FSM extraction
+    # FSM extraction (final, post-training). Reuse the last in-training
+    # snapshot if it already landed exactly on the final episode, instead of
+    # extracting twice.
     print_section("FSM EXTRACTION")
-    fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr, args.min_transition_visits)
+    if fsm_snapshots and fsm_snapshots[-1]['epoch'] == args.n_episodes:
+        final_snapshot = fsm_snapshots[-1]
+    else:
+        final_snapshot = _take_fsm_snapshot(
+            agent, encoder, game, opponent_coop, game_abbr,
+            args.min_transition_visits, args.n_episodes
+        )
+        fsm_snapshots.append(final_snapshot)
 
     fidelity_data = {
-        'fidelity_train': fsm_data['fidelity'],
-        'geometric_states': fsm_data['geometric_states'],
-        'lstar_states': fsm_data['lstar_states'],
-        'minimized_states': fsm_data['minimized_states'],
-        'fsm_structure': fsm_data['fsm_structure']
+        'fidelity_train': final_snapshot['fidelity_train'],
+        'geometric_states': final_snapshot['geometric_states'],
+        'lstar_states': final_snapshot['lstar_states'],
+        'minimized_states': final_snapshot['minimized_states'],
+        'fsm_structure': final_snapshot['fsm_structure']
     }
     with open(output_dir / 'fidelity_train.json', 'w') as f:
         json.dump(fidelity_data, f, indent=2)
+
+    # Save FSM-size-over-training trajectory (one entry per snapshot epoch)
+    fsm_trajectory_data = {
+        'game': args.game,
+        'opponent_coop': opponent_coop,
+        'hidden_size': args.hidden_size,
+        'input_condition': args.input_condition,
+        'seed': args.seed,
+        'fsm_snapshot_interval': args.fsm_snapshot_interval,
+        'snapshots': fsm_snapshots
+    }
+    with open(output_dir / 'fsm_size_trajectory.json', 'w') as f:
+        json.dump(fsm_trajectory_data, f, indent=2)
+    print(f"  Saved FSM size trajectory ({len(fsm_snapshots)} snapshots) to "
+          f"{output_dir / 'fsm_size_trajectory.json'}")
 
     # Save checkpoint
     if args.save_checkpoint:
@@ -383,6 +437,7 @@ def _train_generalist(args, base_config, encoder, game, game_abbr, opponent_set,
     all_trajectories = []
     episode_rewards = []
     episode_opponent_coops = []
+    fsm_snapshots = []
 
     for episode in range(args.n_episodes):
         # Resample the opponent's cooperation probability for this episode
@@ -405,6 +460,19 @@ def _train_generalist(args, base_config, encoder, game, game_abbr, opponent_set,
             std_r = np.std(episode_rewards[-100:])
             print(f"  Episode {episode+1}/{args.n_episodes}: "
                   f"Reward = {mean_r:.1f} ± {std_r:.1f}", flush=True)
+
+        if args.fsm_snapshot_interval > 0 and (episode + 1) % args.fsm_snapshot_interval == 0:
+            print(f"  Taking FSM snapshot at epoch {episode+1} (all opponent levels)...", flush=True)
+            fsm_snapshots.append({
+                'epoch': episode + 1,
+                'results': [
+                    _take_fsm_snapshot(
+                        agent, encoder, game, opp, game_abbr,
+                        args.min_transition_visits, episode + 1
+                    )
+                    for opp in opponent_set
+                ]
+            })
 
     training_time = time.time() - start_time
     print(f"\n  Training completed in {training_time:.1f}s")
@@ -452,28 +520,50 @@ def _train_generalist(args, base_config, encoder, game, game_abbr, opponent_set,
         )
         print(f"  Saved {n_saved} episodes to {traj_path}")
 
-    # FSM extraction at each opponent level
+    # FSM extraction at each opponent level (final, post-training). Reuse the
+    # last in-training snapshot if it already landed exactly on the final
+    # episode, instead of extracting twice.
     print_section("FSM EXTRACTION (per opponent level)")
-    fsm_results = []
-    for opponent_coop in opponent_set:
-        print(f"\n  -- opponent_coop={opponent_coop:.1f} --")
-        fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr, args.min_transition_visits)
-        fsm_results.append({
-            'opponent_coop': float(opponent_coop),
-            'fidelity_train': fsm_data['fidelity'],
-            'geometric_states': fsm_data['geometric_states'],
-            'lstar_states': fsm_data['lstar_states'],
-            'minimized_states': fsm_data['minimized_states'],
-            'fsm_structure': fsm_data['fsm_structure']
-        })
+    if fsm_snapshots and fsm_snapshots[-1]['epoch'] == args.n_episodes:
+        final_epoch_snapshot = fsm_snapshots[-1]
+    else:
+        print(f"\n  -- final snapshot, all opponent levels --")
+        final_epoch_snapshot = {
+            'epoch': args.n_episodes,
+            'results': [
+                _take_fsm_snapshot(
+                    agent, encoder, game, opp, game_abbr,
+                    args.min_transition_visits, args.n_episodes
+                )
+                for opp in opponent_set
+            ]
+        }
+        fsm_snapshots.append(final_epoch_snapshot)
 
     fidelity_data = {
         'training_mode': 'generalist',
         'opponent_set': [float(o) for o in opponent_set],
-        'results': fsm_results
+        'results': final_epoch_snapshot['results']
     }
     with open(output_dir / 'fidelity_train.json', 'w') as f:
         json.dump(fidelity_data, f, indent=2)
+
+    # Save FSM-size-over-training trajectory (one entry per snapshot epoch,
+    # each holding per-opponent-level results)
+    fsm_trajectory_data = {
+        'game': args.game,
+        'training_mode': 'generalist',
+        'opponent_set': [float(o) for o in opponent_set],
+        'hidden_size': args.hidden_size,
+        'input_condition': args.input_condition,
+        'seed': args.seed,
+        'fsm_snapshot_interval': args.fsm_snapshot_interval,
+        'snapshots': fsm_snapshots
+    }
+    with open(output_dir / 'fsm_size_trajectory.json', 'w') as f:
+        json.dump(fsm_trajectory_data, f, indent=2)
+    print(f"  Saved FSM size trajectory ({len(fsm_snapshots)} snapshots) to "
+          f"{output_dir / 'fsm_size_trajectory.json'}")
 
     # Save checkpoint
     if args.save_checkpoint:
@@ -750,6 +840,12 @@ def main():
                         help='Minimum rollout visits required for a (state, symbol) '
                              'transition to be considered defined during FSM extraction '
                              '(default: 3)')
+    parser.add_argument('--fsm-snapshot-interval', type=int, default=1000,
+                        help='Extract and minimize the FSM every K training episodes, '
+                             'saving its size alongside the full FSM structure to '
+                             'fsm_size_trajectory.json -- enables plotting FSM size as a '
+                             'function of training epoch and game. Set to 0 to disable '
+                             '(default: 1000)')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed (default: 42)')
     parser.add_argument('--n-episodes', type=int, default=10000,
