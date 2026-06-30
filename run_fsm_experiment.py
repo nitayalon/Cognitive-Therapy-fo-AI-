@@ -137,10 +137,16 @@ def compute_fidelity_score(agent, fsm, env, encoder, n_episodes=50):
     return matching_steps / total_steps
 
 
-def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
+def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr, min_transition_visits=3):
     """
     Extract FSM from agent and return comprehensive data.
-    
+
+    Args:
+        min_transition_visits: passed through to LStarExtractor -- a
+            (state, symbol) pair observed fewer than this many times is
+            left undefined rather than defined from a noisy minority
+            sample (config-exposed; default 3).
+
     Returns:
         dict with keys:
             - fsm: Minimized FSM object
@@ -180,7 +186,7 @@ def extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr):
     # Extract FSM with L*
     print("  Running L* algorithm...")
     alphabet = ["START", "CC", "CD", "DC", "DD"]
-    lstar = LStarExtractor(alphabet=alphabet)
+    lstar = LStarExtractor(alphabet=alphabet, min_transition_visits=min_transition_visits)
     fsm = lstar.extract_fsm(trajectories, clusters, clusterer, encoder)
     
     lstar_states = len(fsm.states)
@@ -310,7 +316,7 @@ def _train_one_opponent(args, base_config, encoder, game, game_abbr, opponent_co
 
     # FSM extraction
     print_section("FSM EXTRACTION")
-    fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr)
+    fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr, args.min_transition_visits)
 
     fidelity_data = {
         'fidelity_train': fsm_data['fidelity'],
@@ -451,7 +457,7 @@ def _train_generalist(args, base_config, encoder, game, game_abbr, opponent_set,
     fsm_results = []
     for opponent_coop in opponent_set:
         print(f"\n  -- opponent_coop={opponent_coop:.1f} --")
-        fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr)
+        fsm_data = extract_fsm_with_data(agent, encoder, game, opponent_coop, game_abbr, args.min_transition_visits)
         fsm_results.append({
             'opponent_coop': float(opponent_coop),
             'fidelity_train': fsm_data['fidelity'],
@@ -652,7 +658,7 @@ def test_mode(args):
             
             # Extract FSM on test data
             print(f"  Extracting FSM...")
-            fsm_data = extract_fsm_with_data(agent, encoder, game, test_opponent_coop, game_abbr)
+            fsm_data = extract_fsm_with_data(agent, encoder, game, test_opponent_coop, game_abbr, args.min_transition_visits)
             
             # Store results
             result = {
@@ -740,6 +746,10 @@ def main():
     parser.add_argument('--input-condition', type=str, default='no_game',
                         choices=['no_game', 'game_tag'],
                         help='Input encoding condition (default: no_game)')
+    parser.add_argument('--min-transition-visits', type=int, default=3,
+                        help='Minimum rollout visits required for a (state, symbol) '
+                             'transition to be considered defined during FSM extraction '
+                             '(default: 3)')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed (default: 42)')
     parser.add_argument('--n-episodes', type=int, default=10000,

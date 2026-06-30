@@ -17,7 +17,7 @@ from pathlib import Path
 import yaml
 
 from cognitive_therapy_ai.games import Action, PrisonersDilemma
-from cognitive_therapy_ai.opponent import ProbabilisticOpponent
+from cognitive_therapy_ai.opponent import ProbabilisticOpponent, Opponent
 from cognitive_therapy_ai.encoding import ObservationEncoder
 from cognitive_therapy_ai.representation_agent import RepresentationAgent
 from cognitive_therapy_ai.reinforce_trainer import SessionEnvironment, REINFORCETrainer, train_to_convergence
@@ -50,8 +50,10 @@ def create_simple_trained_agent(device='cpu'):
         T=payoff[1][0], R=payoff[0][0],
         P=payoff[1][1], S=payoff[0][1]
     )
-    opponent = ProbabilisticOpponent(defection_probability=0.9)
-    
+    # SessionEnvironment expects the Opponent wrapper (.play_action()),
+    # not the bare OpponentStrategy (.choose_action()).
+    opponent = Opponent(ProbabilisticOpponent(defection_probability=0.9))
+
     # Create encoder and environment
     encoder = ObservationEncoder('no_game')
     env = SessionEnvironment(game, opponent, encoder, T=50, game_name=None)
@@ -140,6 +142,33 @@ class TestRolloutCollector:
         # Both should have actions
         assert len(traj_deterministic.actions) > 0
         assert len(traj_explore.actions) > 0
+
+    def test_exploration_advances_hidden_state(self):
+        """Regression test for the epsilon-explore hidden-state-skip bug:
+        exploring steps must not desync the recorded hidden state from the
+        network's own forward-pass trajectory. Forces exploration on every
+        step, then independently replays the SAME observation sequence
+        through the network from a fresh hidden state and asserts every
+        recorded hidden state matches exactly (no skipped/duplicated
+        forward pass)."""
+        agent, encoder, env = create_simple_trained_agent()
+        collector = RolloutCollector(agent, encoder)
+
+        traj = collector.collect_trajectory(env, max_steps=15, epsilon_explore=1.0)
+
+        hidden_state = agent.reset_hidden_state(batch_size=1)
+        for t, obs in enumerate(traj.observations):
+            obs_tensor = torch.tensor(obs, dtype=torch.float32)
+            with torch.no_grad():
+                _, _, hidden_state = agent.select_action(
+                    obs_tensor, hidden_state, deterministic=True, epsilon=0.0
+                )
+            replayed_h = hidden_state[0].cpu().numpy().flatten()
+            np.testing.assert_allclose(
+                replayed_h, traj.hidden_states[t], rtol=1e-6, atol=1e-6,
+                err_msg=f"hidden state at step {t} does not match the network's own "
+                        f"forward-pass trajectory -- exploration desynced the recurrent state"
+            )
 
 
 class TestHiddenStateClusterer:
@@ -237,6 +266,82 @@ class TestLStarExtractor:
         
         assert fsm.initial_state is not None
         assert fsm.initial_state in fsm.states
+
+
+class _FakeClusterer:
+    """Minimal stand-in satisfying HiddenStateClusterer's predict() interface
+    (LStarExtractor.extract_fsm only ever calls .predict()), so transition
+    voting/threshold logic can be tested with fully-controlled cluster
+    assignments instead of fitting real KMeans."""
+
+    def predict(self, hidden_state):
+        return int(round(float(hidden_state[0])))
+
+
+class TestLStarExtractorTransitionVoting:
+    """Test majority-vote transition building with a min-visit threshold
+    (Stage 1 fix 2: replaces the old last-write-wins transition table)."""
+
+    @staticmethod
+    def _make_traj(encoder, cluster_a, symbol, action, cluster_b):
+        """A 2-timestep synthetic trajectory that casts exactly one vote
+        for (cluster_a, symbol) -> (cluster_b, action)."""
+        if symbol == "START":
+            obs0 = encoder.encode_start_token(game_name=None)
+        else:
+            agent_act = Action.COOPERATE if symbol[0] == "C" else Action.DEFECT
+            opp_act = Action.COOPERATE if symbol[1] == "C" else Action.DEFECT
+            obs0 = encoder.encode_observation(
+                agent_last_action=agent_act, opponent_last_action=opp_act, game_name=None
+            )
+        obs1 = encoder.encode_observation(
+            agent_last_action=Action.DEFECT, opponent_last_action=Action.DEFECT, game_name=None
+        )
+        return Trajectory(
+            observations=[obs0, obs1],
+            actions=[action, Action.DEFECT],
+            hidden_states=[np.array([float(cluster_a)]), np.array([float(cluster_b)])],
+            rewards=[0.0, 0.0],
+            opponent_actions=[None, Action.DEFECT],
+        )
+
+    def test_majority_vote_picks_modal_target(self):
+        """5 votes for (0,"CC")->(0,DEFECT) vs. 2 votes for
+        (0,"CC")->(1,COOPERATE): the modal (majority) outcome must win,
+        not whichever vote happened to be last."""
+        encoder = ObservationEncoder('no_game')
+        trajectories = (
+            [self._make_traj(encoder, 0, "CC", Action.DEFECT, 0) for _ in range(5)] +
+            [self._make_traj(encoder, 0, "CC", Action.COOPERATE, 1) for _ in range(2)]
+        )
+        extractor = LStarExtractor(encoder.get_alphabet(), min_transition_visits=3)
+        fsm = extractor.extract_fsm(trajectories, clusters=[], clusterer=_FakeClusterer(), encoder=encoder)
+
+        assert fsm.transitions[(0, "CC")] == (0, Action.DEFECT)
+        assert fsm.transition_visit_counts[(0, "CC")] == 7
+
+    def test_sub_threshold_transition_is_undefined(self):
+        """A (state, symbol) pair observed fewer times than
+        min_transition_visits must be left undefined, not forced from a
+        small sample -- even though every observed vote agrees."""
+        encoder = ObservationEncoder('no_game')
+        trajectories = [self._make_traj(encoder, 0, "DD", Action.DEFECT, 0) for _ in range(2)]
+        extractor = LStarExtractor(encoder.get_alphabet(), min_transition_visits=3)
+        fsm = extractor.extract_fsm(trajectories, clusters=[], clusterer=_FakeClusterer(), encoder=encoder)
+
+        assert (0, "DD") not in fsm.transitions
+        assert fsm.transition_visit_counts[(0, "DD")] == 2
+
+    def test_threshold_is_configurable(self):
+        """Lowering min_transition_visits to 1 should define a transition
+        from a single observed visit."""
+        encoder = ObservationEncoder('no_game')
+        trajectories = [self._make_traj(encoder, 0, "DD", Action.DEFECT, 0)]
+        extractor = LStarExtractor(encoder.get_alphabet(), min_transition_visits=1)
+        fsm = extractor.extract_fsm(trajectories, clusters=[], clusterer=_FakeClusterer(), encoder=encoder)
+
+        assert fsm.transitions[(0, "DD")] == (0, Action.DEFECT)
+        assert fsm.transition_visit_counts[(0, "DD")] == 1
 
 
 class TestFSMOperations:
@@ -357,6 +462,94 @@ class TestHopcroftMinimizer:
         # Should merge to 1 state
         assert min_fsm.n_states <= 1
 
+    def test_partial_automaton_collapses_with_single_observed_self_loop(self):
+        """Stage 0 regression test: a hand-built partial machine with N
+        states that all emit the same action but each only has ONE
+        observed self-loop, each on a DIFFERENT symbol (so every state is
+        undefined on every other symbol) -- they must all minimize to 1
+        state, since no two of them ever disagree on anything actually
+        observed. (Each state having its single observed transition on a
+        *different* symbol is essential: that's exactly the asymmetric
+        coverage pattern that made the old signature-bucketing minimizer
+        treat "undefined" as a concrete, distinguishing value and refuse
+        to merge -- confirmed to give 4 states on the pre-fix algorithm,
+        vs. 1 here.)"""
+        fsm = FSM(
+            states={0, 1, 2, 3},
+            alphabet=["A", "B", "C", "D"],
+            transitions={
+                (0, "A"): (0, Action.DEFECT),
+                (1, "B"): (1, Action.DEFECT),
+                (2, "C"): (2, Action.DEFECT),
+                (3, "D"): (3, Action.DEFECT),
+            },
+            initial_state=0,
+            n_states=4
+        )
+
+        minimizer = HopcroftMinimizer()
+        min_fsm = minimizer.minimize(fsm)
+
+        assert min_fsm.n_states == 1
+
+    def test_partial_automaton_keeps_genuinely_distinguished_states_apart(self):
+        """Stage 0 regression test: if an OBSERVED transition actually
+        disagrees between two states (same symbol, both defined, different
+        action), they must NOT be merged -- don't-care semantics only
+        apply to UNDEFINED transitions, never to a real conflict."""
+        fsm = FSM(
+            states={0, 1},
+            alphabet=["A"],
+            transitions={
+                (0, "A"): (0, Action.COOPERATE),
+                (1, "A"): (1, Action.DEFECT),
+            },
+            initial_state=0,
+            n_states=2
+        )
+
+        minimizer = HopcroftMinimizer()
+        min_fsm = minimizer.minimize(fsm)
+
+        assert min_fsm.n_states == 2
+
+    def test_partial_automaton_mixed_case(self):
+        """A partial machine with 3 states: states 0 and 1 each have a
+        single observed self-loop on a DIFFERENT symbol (both DEFECT,
+        like the test above) and should merge; state 2 has both symbols
+        observed with a genuinely different action (COOPERATE) and must
+        stay apart. (Pre-fix algorithm gives 3 states here -- 0 and 1
+        never merge because their undefined symbols don't line up;
+        post-fix gives 2.)"""
+        fsm = FSM(
+            states={0, 1, 2},
+            alphabet=["A", "B"],
+            transitions={
+                (0, "A"): (0, Action.DEFECT),
+                # state 0 undefined on "B"
+                (1, "B"): (1, Action.DEFECT),
+                # state 1 undefined on "A"
+                (2, "A"): (2, Action.COOPERATE),  # genuinely different
+                (2, "B"): (2, Action.COOPERATE),
+            },
+            initial_state=0,
+            n_states=3
+        )
+
+        minimizer = HopcroftMinimizer()
+        min_fsm = minimizer.minimize(fsm)
+
+        assert min_fsm.n_states == 2
+        # The merged block (from states 0,1) must emit DEFECT; state 2's
+        # block must emit COOPERATE -- find which is which via fsm.states.
+        actions = set()
+        for state in min_fsm.states:
+            for symbol in ("A", "B"):
+                action = min_fsm.get_action(state, symbol)
+                if action is not None:
+                    actions.add(action)
+        assert actions == {Action.DEFECT, Action.COOPERATE}
+
 
 class TestFSMValidator:
     """Test FSM validation."""
@@ -462,10 +655,15 @@ def test_gate5_integration():
         T=payoff[1][0], R=payoff[0][0],
         P=payoff[1][1], S=payoff[0][1]
     )
-    opponent = ProbabilisticOpponent(defection_probability=0.1)
-    
+    # FSMValidator.validate_against_best_response() reads
+    # opponent.defection_probability directly (bare strategy), while
+    # SessionEnvironment.step() calls opponent.play_action() (Opponent
+    # wrapper) -- keep both references since this test uses both consumers.
+    opponent_strategy = ProbabilisticOpponent(defection_probability=0.1)
+    opponent = Opponent(opponent_strategy)
+
     print(f"Game: PD, Opponent: p_coop=0.9")
-    
+
     # Create encoder and environment
     encoder = ObservationEncoder('no_game')
     env = SessionEnvironment(game, opponent, encoder, T=100, game_name=None)
@@ -513,7 +711,7 @@ def test_gate5_integration():
     print("\nValidating FSM...")
     validator = FSMValidator(encoder)
     metrics = validator.validate_against_best_response(
-        fsm, game, opponent,
+        fsm, game, opponent_strategy,
         n_validation_episodes=100,
         max_steps=100
     )

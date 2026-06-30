@@ -103,12 +103,12 @@ loss_by_game_opponent_and_network_size
 ```
 ```{r pd policy per network}
 training_data_behaviour %>% 
-  filter(game == "stag-hunt") %>% 
-  group_by(hidden_size, opponent, episode) %>% 
+  filter(game == "stag-hunt", hidden_size == 8) %>% 
+  group_by(episode, opponent) %>% 
   summarise(mean_coop = mean(agent_cooperation_prob)) %>% 
-  ggplot(aes(x = episode, y = mean_coop, colour = factor(opponent)))+
+  ggplot(aes(x = episode, y = mean_coop, color = factor(opponent)))+
   geom_point() + 
-  geom_line() + 
+  geom_smooth() + 
   facet_wrap(. ~ factor(hidden_size))
 
 ```

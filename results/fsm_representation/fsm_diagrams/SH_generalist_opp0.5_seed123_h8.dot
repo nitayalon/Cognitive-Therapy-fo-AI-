@@ -1,0 +1,22 @@
+digraph FSM {
+  label="H=8 SH GENERALIST opp=0.5 seed=123\nstates=6 fidelity=1.000"; labelloc=t; fontsize=10;
+  rankdir=LR;
+  0 [shape=doublecircle];
+  1 [shape=circle];
+  2 [shape=circle];
+  3 [shape=circle];
+  4 [shape=circle];
+  5 [shape=circle];
+  START [shape=plaintext, fontcolor=gray];
+  0 -> 0 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">D</FONT>>];
+  1 -> 2 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">D</FONT>>];
+  1 -> 1 [label=<<FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>>];
+  2 -> 5 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">D</FONT>>];
+  2 -> 2 [label=<<FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">D</FONT>>];
+  3 -> 4 [label=<<FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">C</FONT>>];
+  4 -> 1 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">D</FONT>>];
+  5 -> 0 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">D</FONT>>];
+  5 -> 5 [label=<<FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">C</FONT>>];
+  START -> 4 [label=<<FONT COLOR="blue">START</FONT>/<FONT COLOR="red">C</FONT>>];
+  START -> 1 [label=<<FONT COLOR="blue">START</FONT>/<FONT COLOR="red">D</FONT>>];
+}

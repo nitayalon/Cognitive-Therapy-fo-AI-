@@ -218,3 +218,6 @@ SLURM_FIXES_SUMMARY.md
 
 # General scripts and diagnostics (not for git)
 general_scripts/
+general_script/
+results/tmp_fsm_debug/
+.Rproj.user

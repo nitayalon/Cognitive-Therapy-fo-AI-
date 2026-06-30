@@ -1,11 +1,12 @@
 digraph FSM {
-  label="H=2 PD opp=0.3 seed=42\nstates=2 fidelity=1.000"; labelloc=t; fontsize=10;
+  label="H=4 SH opp=0.5 seed=42\nstates=3 fidelity=1.000"; labelloc=t; fontsize=10;
   rankdir=LR;
   0 [shape=doublecircle];
   1 [shape=circle];
+  2 [shape=circle];
   START [shape=plaintext, fontcolor=gray];
   0 -> 0 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">D</FONT>>];
-  1 -> 1 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>>];
-  1 -> 0 [label=<<FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">D</FONT>>];
+  2 -> 0 [label=<<FONT COLOR="blue">CC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">CD</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DC</FONT>/<FONT COLOR="red">D</FONT>, <FONT COLOR="blue">DD</FONT>/<FONT COLOR="red">C</FONT>>];
+  START -> 2 [label=<<FONT COLOR="blue">START</FONT>/<FONT COLOR="red">C</FONT>>];
   START -> 0 [label=<<FONT COLOR="blue">START</FONT>/<FONT COLOR="red">D</FONT>>];
 }

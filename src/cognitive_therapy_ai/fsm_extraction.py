@@ -15,7 +15,7 @@ This is critical for the research claim: the training environment shapes an agen
 internal representation, which we can extract and analyze as a discrete automaton.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Set, Optional
 import numpy as np
 import torch
@@ -63,6 +63,13 @@ class FSM:
     transitions: Dict[Tuple[int, str], Tuple[int, Action]]  # (state, input) -> (next_state, action)
     initial_state: int  # Starting state
     n_states: int  # Number of states
+    # (state, symbol) -> total number of rollout visits observed for that
+    # pair, regardless of whether it met min_transition_visits and is
+    # therefore defined in `transitions`. Populated by LStarExtractor so the
+    # majority-vote / min-visit-threshold decision is auditable. Empty for
+    # FSMs not produced by LStarExtractor.extract_fsm (e.g. minimized FSMs,
+    # or FSMs built directly in tests).
+    transition_visit_counts: Dict[Tuple[int, str], int] = field(default_factory=dict)
     
     def get_action(self, state: int, input_symbol: str) -> Optional[Action]:
         """Get action for state and input."""
@@ -131,25 +138,45 @@ class RolloutCollector:
         
         for step in range(max_steps):
             observations.append(obs)
-            
-            # Epsilon-greedy exploration
+
+            # Always run the network's own forward pass, so the hidden
+            # state advances genuinely on every step, exploring or not.
+            # (Previously, the epsilon-greedy branch below skipped this
+            # call entirely on exploring steps, so hidden_state never
+            # advanced and the stored hidden state for that step was a
+            # stale duplicate of the previous step's -- corrupting both
+            # the extracted FSM's transitions and any fidelity computed
+            # on exploratory rollouts.)
+            obs_tensor = torch.tensor(obs, dtype=torch.float32, device=self.device)
+            with torch.no_grad():
+                policy_action, _, hidden_state = self.agent.select_action(
+                    obs_tensor, hidden_state,
+                    deterministic=deterministic_after_explore,
+                    epsilon=0.0
+                )
+
+            # Epsilon-greedy exploration overrides which action is
+            # EXECUTED in the environment (to probe off-policy
+            # joint-history symbols for coverage); it does NOT touch
+            # hidden_state, which has already advanced above via the
+            # network's own forward pass on the real observation `obs`.
+            # The executed action (random if exploring, else the
+            # policy's own choice) is what is recorded below (`actions`,
+            # consumed by LStarExtractor as the transition's output) and
+            # what feeds the environment -- so the recorded tuple
+            # (input symbol, hidden state, action) always reflects the
+            # network's genuine recurrent dynamics, never a desynced or
+            # duplicated hidden state.
             if np.random.rand() < epsilon_explore:
-                # Random action (integer)
                 action = np.random.randint(0, 2)
             else:
-                # Policy action - convert obs to tensor
-                obs_tensor = torch.tensor(obs, dtype=torch.float32, device=self.device)
-                with torch.no_grad():
-                    action, _, hidden_state = self.agent.select_action(
-                        obs_tensor, hidden_state,
-                        deterministic=deterministic_after_explore,
-                        epsilon=0.0
-                    )
-            
-            # Store hidden state (h component of LSTM)
+                action = policy_action
+
+            # Store hidden state (h component of LSTM) -- always the
+            # network's own post-forward-pass state, exploring or not.
             h_t = hidden_state[0].cpu().numpy().flatten()
             hidden_states.append(h_t)
-            
+
             # Step environment (action is integer 0 or 1)
             # Note: step() returns 6 values, but we only need the first 3 for FSM extraction
             next_obs, reward, done, _, _, _ = env.step(action)
@@ -273,14 +300,25 @@ class HiddenStateClusterer:
 class LStarExtractor:
     """
     L* algorithm for FSM extraction.
-    
+
     Learns a minimal DFA from input-output traces.
     This is a simplified version that builds the FSM directly from clustered trajectories.
     """
-    
-    def __init__(self, alphabet: List[str]):
+
+    DEFAULT_MIN_TRANSITION_VISITS = 3
+
+    def __init__(self, alphabet: List[str], min_transition_visits: int = DEFAULT_MIN_TRANSITION_VISITS):
+        """
+        Args:
+            alphabet: Input alphabet symbols.
+            min_transition_visits: A (state, symbol) pair observed fewer
+                than this many times across all rollout visits is left
+                undefined rather than defined from a single (or otherwise
+                too-small) sample. Config-exposed; default 3.
+        """
         self.alphabet = alphabet
-    
+        self.min_transition_visits = min_transition_visits
+
     def extract_fsm(
         self,
         trajectories: List[Trajectory],
@@ -290,48 +328,76 @@ class LStarExtractor:
     ) -> FSM:
         """
         Extract FSM from clustered trajectories.
-        
+
+        Builds the transition table by MAJORITY VOTE per (state, symbol)
+        across all rollout visits -- not last-write-wins. Each visit to a
+        given (state, symbol) pair casts one vote for its observed
+        (next_state, output_action); the most frequent vote is recorded as
+        that pair's transition. A (state, symbol) pair observed fewer than
+        `self.min_transition_visits` times overall is left undefined
+        (absent from `transitions`) rather than forced from a small,
+        possibly-noisy sample. Total visit counts per (state, symbol) are
+        recorded in the returned FSM's `transition_visit_counts` so the
+        threshold decision is auditable.
+
         Args:
             trajectories: Collected trajectories
             clusters: Clustered states
             clusterer: Trained clusterer for state assignment
             encoder: Observation encoder for symbol mapping
-        
+
         Returns:
             Extracted FSM
         """
-        # Build transition table
-        transitions = {}
+        # votes[(state, symbol)][(next_state, action)] = number of rollout
+        # visits to (state, symbol) that observed this particular outcome.
+        votes: Dict[Tuple[int, str], Dict[Tuple[int, Action], int]] = defaultdict(lambda: defaultdict(int))
         state_visits = set()
-        
+
         for traj in trajectories:
             for t in range(len(traj.hidden_states)):
                 # Current state
                 current_cluster = clusterer.predict(traj.hidden_states[t])
                 state_visits.add(current_cluster)
-                
+
                 # Input symbol from observation
                 obs = traj.observations[t]
                 input_symbol = self._observation_to_symbol(obs, encoder)
-                
+
                 # Output action
                 output_action = traj.actions[t]
-                
+
                 # Next state (if exists)
                 if t + 1 < len(traj.hidden_states):
                     next_cluster = clusterer.predict(traj.hidden_states[t + 1])
-                    
-                    # Record transition
                     key = (current_cluster, input_symbol)
-                    transitions[key] = (next_cluster, output_action)
-        
+                    votes[key][(next_cluster, output_action)] += 1
+
+        # Resolve each (state, symbol) pair by majority vote, subject to
+        # the minimum-visit threshold.
+        transitions = {}
+        visit_counts = {}
+        for key, candidates in votes.items():
+            total_visits = sum(candidates.values())
+            visit_counts[key] = total_visits
+            if total_visits < self.min_transition_visits:
+                continue  # too few observations -- leave undefined
+            # Most frequent (next_state, action); ties broken deterministically
+            # (smaller next_state, then action name) for reproducibility.
+            winner, _ = max(
+                candidates.items(),
+                key=lambda kv: (kv[1], -kv[0][0], kv[0][1].name)
+            )
+            transitions[key] = winner
+
         # Create FSM
         fsm = FSM(
             states=state_visits,
             alphabet=self.alphabet,
             transitions=transitions,
             initial_state=0,  # Assume cluster 0 is initial
-            n_states=len(state_visits)
+            n_states=len(state_visits),
+            transition_visit_counts=visit_counts,
         )
         
         return fsm
@@ -358,94 +424,107 @@ class LStarExtractor:
 
 
 class HopcroftMinimizer:
-    """Hopcroft's algorithm for DFA minimization."""
-    
+    """
+    Minimizes an FSM with respect to OBSERVED behavior.
+
+    The FSMs extracted from rollouts are partial automata: many
+    (state, symbol) transitions are legitimately undefined because that
+    pair was never observed often enough to pass LStarExtractor's
+    min_transition_visits threshold. The original implementation treated
+    "undefined" as if it were a distinct, concrete transition value (a
+    state with an undefined transition could only match another state
+    that was undefined on that exact same symbol) -- this manufactures
+    spurious distinctions between states that are behaviorally identical
+    on everything that WAS actually observed, and was the leading cause
+    of FSM state-count inflation for simple policies (e.g. a pure-defect
+    policy that only ever traverses one DD->DD self-loop, leaving every
+    other transition unobserved).
+
+    This implementation instead minimizes with PARTIAL-AUTOMATON
+    ("don't-care") semantics: an undefined transition never distinguishes
+    two states. Two states are merged unless some symbol on which BOTH
+    have an observed (defined) transition shows a different action or
+    leads to provably-distinguishable next-states. The resulting
+    minimality claim is honest and explicit: states merge when no
+    OBSERVED transition distinguishes them -- not when no transition
+    could possibly distinguish them under complete information.
+
+    Implementation note: for a partial automaton, "compatible" (no
+    observed conflict between two states) is NOT a transitive relation in
+    general -- a sparsely-observed state B can be individually compatible
+    with both A and C without A and C being compatible with each other
+    (B's missing observations are simply silent on the symbol where A and
+    C actually disagree). This means classical Hopcroft/Moore
+    signature-bucketing (which assumes "same signature" is an equivalence
+    relation) is not directly applicable. Instead this performs greedy
+    pairwise state-merging with full re-verification of global
+    consistency after every merge -- a standard technique from
+    grammatical inference / partial-DFA state merging (e.g. RPNI-style
+    blue-fringe merging) -- in a fixed deterministic order (states and
+    block-pairs always tried in sorted order) for reproducibility.
+    """
+
     def minimize(self, fsm: FSM) -> FSM:
         """
-        Minimize FSM using Hopcroft's algorithm.
-        
-        This is a simplified version that merges equivalent states.
-        Two states are equivalent if they produce the same outputs and
-        transition to equivalent states for all inputs.
-        
+        Minimize FSM with respect to observed behavior (see class
+        docstring). Undefined (state, symbol) transitions never
+        distinguish states; only an observed disagreement does.
+
         Args:
-            fsm: Input FSM
-        
+            fsm: Input (partial) FSM
+
         Returns:
-            Minimized FSM
+            Observed-behavior-minimal FSM.
         """
-        # Start with all states in one partition, then refine
-        partitions = [set(fsm.states)]
-        
-        # Iteratively refine partitions
-        changed = True
-        max_iterations = 100
-        iteration = 0
-        
-        while changed and iteration < max_iterations:
-            changed = False
-            iteration += 1
-            new_partitions = []
-            
-            for partition in partitions:
-                if len(partition) <= 1:
-                    new_partitions.append(partition)
-                    continue
-                
-                # Try to split this partition
-                sub_partitions = self._split_partition(partition, fsm, partitions)
-                
-                if len(sub_partitions) > 1:
-                    changed = True
-                    new_partitions.extend(sub_partitions)
-                else:
-                    new_partitions.append(partition)
-            
-            partitions = new_partitions
-        
-        # Build minimized FSM
-        return self._build_minimized_fsm(fsm, partitions)
-    
-    def _split_partition(
-        self,
-        partition: Set[int],
-        fsm: FSM,
-        all_partitions: List[Set[int]]
-    ) -> List[Set[int]]:
-        """Split partition based on distinguishability."""
-        # Group states by their transition signatures
-        signatures = defaultdict(set)
-        
-        for state in partition:
-            sig = self._get_signature(state, fsm, all_partitions)
-            signatures[sig].add(state)
-        
-        return list(signatures.values())
-    
-    def _get_signature(
-        self,
-        state: int,
-        fsm: FSM,
-        partitions: List[Set[int]]
-    ) -> Tuple:
-        """Get transition signature for a state."""
-        sig = []
-        for symbol in fsm.alphabet:
-            next_state = fsm.get_next_state(state, symbol)
-            action = fsm.get_action(state, symbol)
-            
-            # Find which partition the next state belongs to
-            partition_idx = -1
-            if next_state is not None:
-                for idx, part in enumerate(partitions):
-                    if next_state in part:
-                        partition_idx = idx
+        partition = [{s} for s in sorted(fsm.states)]
+
+        merged_any = True
+        while merged_any:
+            merged_any = False
+            for i in range(len(partition)):
+                for j in range(i + 1, len(partition)):
+                    candidate = (
+                        partition[:i] + partition[i + 1:j] + partition[j + 1:]
+                        + [partition[i] | partition[j]]
+                    )
+                    if self._is_consistent(candidate, fsm):
+                        partition = candidate
+                        merged_any = True
                         break
-            
-            sig.append((partition_idx, action))
-        
-        return tuple(sig)
-    
+                if merged_any:
+                    break
+
+        return self._build_minimized_fsm(fsm, partition)
+
+    def _is_consistent(self, partition: List[Set[int]], fsm: FSM) -> bool:
+        """
+        True if no block in `partition` contains two states with observed
+        (defined) transitions on the same symbol that disagree -- either
+        in output action or in which block their next-states fall into.
+        Undefined transitions impose no constraint (don't-care): a block
+        with at most one "opinion" per symbol (from however many members
+        actually have a defined transition there) is consistent.
+        """
+        state_to_block = {}
+        for idx, block in enumerate(partition):
+            for s in block:
+                state_to_block[s] = idx
+
+        for block in partition:
+            for symbol in fsm.alphabet:
+                observed = None  # (action, next_block_idx) agreed on so far
+                for state in block:
+                    next_state = fsm.get_next_state(state, symbol)
+                    if next_state is None:
+                        continue  # unobserved -- don't-care, no constraint
+                    action = fsm.get_action(state, symbol)
+                    candidate_obs = (action, state_to_block[next_state])
+                    if observed is None:
+                        observed = candidate_obs
+                    elif observed != candidate_obs:
+                        return False
+        return True
+
     def _build_minimized_fsm(
         self,
         original_fsm: FSM,

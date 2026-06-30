@@ -1,8 +1,0 @@
-digraph FSM {
-  label="H=2 PD GENERALIST opp=0.5 seed=42\nstates=2 fidelity=1.000"; labelloc=t; fontsize=10;
-  rankdir=LR;
-  0 [shape=doublecircle];
-  1 [shape=circle];
-  0 -> 0 [label="CC/D, CD/D, DC/D, DD/D"];
-  1 -> 0 [label="START/D, CC/D, CD/D, DC/D, DD/D"];
-}
