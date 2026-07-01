@@ -390,12 +390,18 @@ class LStarExtractor:
             )
             transitions[key] = winner
 
-        # Create FSM
+        # The true initial FSM state is the cluster that h_1 (the hidden
+        # state after the LSTM processes the first START observation from
+        # h_0=zeros) maps to.  hidden_states[0] in every trajectory IS h_1,
+        # so it is guaranteed to be in state_visits.  Hardcoding 0 was wrong:
+        # when KMeans converges to fewer distinct clusters than n_clusters,
+        # cluster label 0 may be absent from the visited set entirely.
+        initial_state = int(clusterer.predict(trajectories[0].hidden_states[0]))
         fsm = FSM(
             states=state_visits,
             alphabet=self.alphabet,
             transitions=transitions,
-            initial_state=0,  # Assume cluster 0 is initial
+            initial_state=initial_state,
             n_states=len(state_visits),
             transition_visit_counts=visit_counts,
         )
